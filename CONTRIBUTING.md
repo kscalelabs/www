@@ -14,22 +14,27 @@ You can contribute to the K-Scale Store project in various ways, such as reporti
 
 # Development
 
-1. [Development Setup](#development-setup)
-   - [Configuration](#configuration)
-   - [Google OAuth Configuration](#google-oauth-configuration)
-   - [GitHub OAuth Configuration](#github-oauth-configuration)
-2. [Database Setup](#database-setup)
-   - [DynamoDB/S3](#dynamodbs3)
-   - [Admin Panel](#admin-panel)
-3. [FastAPI Setup](#fastapi-setup)
-   - [Creating a Python Virtual Environment](#creating-a-python-virtual-environment)
-   - [Installing Project Dependencies](#installing-project-dependencies)
-   - [Initializing the Test Databases](#initializing-the-test-databases)
-   - [Running the FastAPI Application](#running-the-fastapi-application)
-4. [Syncing Frontend and Backend](#syncing-frontend-and-backend)
-5. [React Setup](#react-setup)
-6. [Testing](#testing)
-7. [Stripe Setup](#stripe-setup)
+- [Getting Started](#getting-started)
+- [Development](#development)
+  - [Development Setup](#development-setup)
+    - [Configuration](#configuration)
+    - [Setting Up Environment Variables](#setting-up-environment-variables)
+    - [Google OAuth Configuration](#google-oauth-configuration)
+    - [Github OAuth Configuration](#github-oauth-configuration)
+  - [Database Setup](#database-setup)
+    - [DynamoDB/S3](#dynamodbs3)
+      - [Admin Panel](#admin-panel)
+  - [FastAPI Setup](#fastapi-setup)
+    - [Creating a Python Virtual Environment](#creating-a-python-virtual-environment)
+    - [Activate the virtual environment:](#activate-the-virtual-environment)
+    - [Installing Project Dependencies](#installing-project-dependencies)
+    - [Initializing the Test Databases](#initializing-the-test-databases)
+    - [Running the FastAPI Application](#running-the-fastapi-application)
+  - [Syncing Frontend and Backend](#syncing-frontend-and-backend)
+  - [React Setup](#react-setup)
+  - [Testing](#testing)
+  - [Stripe Setup](#stripe-setup)
+  - [Optional](#optional)
 
 ---
 
@@ -43,8 +48,25 @@ Place the required environment variables in `env.sh` or `.env.local`.
 
 To run the server or tests locally, source the environment variables in each new terminal session:
 
+### Setting Up Environment Variables
+
+**Option 1: Using `.env.sh`**  
+If you prefer, you can place the required environment variables in a file named `env.sh`. To load the environment variables, source the `env.sh` file in each new terminal session:
+
 ```bash
-source env.sh  # or source .env.local
+source env.sh
+```
+Option 2: Renaming .env.example to .env.local
+The repository includes a .env.example file. You can rename it to .env.local and update it with your specific environment settings:
+
+```bash
+cp .env.example .env.local
+```
+
+Then, load the environment variables by sourcing the .env.local file:
+
+```bash
+source .env.local
 ```
 
 **Example `env.sh`/`.env.local` file:**
