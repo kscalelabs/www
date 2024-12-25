@@ -1,3 +1,5 @@
+enable_test_endpoint: false
+
 crypto:
   jwt_secret: ${oc.env:JWT_SECRET}
 dynamo:
