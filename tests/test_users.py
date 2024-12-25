@@ -3,11 +3,12 @@
 from fastapi import status
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
+from pytest_mock.plugin import MockType
 
 from www.app.db import create_tables
 
 
-def test_user_auth_functions(test_client: TestClient) -> None:
+def test_user_auth_functions(test_client: TestClient, mock_send_email: MockType) -> None:
     # Checks that without the session token we get a 401 response.
     response = test_client.get("/users/me")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.json()
@@ -48,6 +49,12 @@ def test_user_auth_functions(test_client: TestClient) -> None:
     response = test_client.delete("/users/me", headers=auth_headers)
     assert response.status_code == status.HTTP_200_OK, response.json()
     assert response.json() is True
+    # Verify delete email was sent
+    mock_send_email.assert_called_with(
+        subject="Account Deleted - K-Scale Labs",
+        body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
+        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+    )
 
     # Tries deleting the user again, which should fail.
     response = test_client.delete("/users/me", headers=auth_headers)
@@ -75,3 +82,30 @@ async def test_user_general_functions(app_client: AsyncClient) -> None:
     updated_user_data = response.json()
     assert updated_user_data["first_name"] == "UpdatedFirstName"
     assert updated_user_data["last_name"] == "UpdatedLastName"
+
+
+async def test_oauth_signup_notifications(app_client: AsyncClient, mock_send_email: MockType) -> None:
+    """Test that signup notification emails are sent when users sign up via OAuth."""
+    await create_tables()
+    mock_send_email.reset_mock()
+
+    # Test GitHub signup
+    response = await app_client.post("/auth/github/code", json={"code": "test_code"})
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    mock_send_email.assert_called_with(
+        subject="Welcome to K-Scale Labs",
+        body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
+        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+    )
+
+    # Reset mock for next test
+    mock_send_email.reset_mock()
+
+    # Test Google signup (should use same email from mock)
+    response = await app_client.post("/auth/google/code", json={"code": "test_code"})
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    mock_send_email.assert_called_with(
+        subject="Welcome to K-Scale Labs",
+        body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
+        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+    )

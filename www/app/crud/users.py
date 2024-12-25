@@ -21,6 +21,7 @@ from www.app.model import (
     User,
     UserPermission,
 )
+from www.app.utils.email import send_signup_notification_email
 from www.settings import settings
 from www.utils import cache_async_result
 
@@ -121,6 +122,7 @@ class UserCrud(BaseCrud):
                 elif provider == "google":
                     user.google_id = user_token
                 await self._add_item(user, unique_fields=["email", "username"])
+                await send_signup_notification_email(email)
             elif provider == "github":
                 await self._update_item(user.id, User, {"github_id": user_token})
             elif provider == "google":
