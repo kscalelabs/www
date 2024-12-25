@@ -20,7 +20,6 @@ from www.app.security.user import (
     verify_admin_permission,
     verify_target_not_admin,
 )
-from www.app.utils.email import send_delete_email
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,6 @@ async def delete_user_endpoint(
     crud: Annotated[Crud, Depends(Crud.get)],
 ) -> bool:
     await crud.delete_user(user.id)
-    await send_delete_email(user.email)
     return True
 
 

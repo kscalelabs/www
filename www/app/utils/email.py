@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 import logging
-import textwrap
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -28,29 +27,6 @@ async def send_email(subject: str, body: str, to: str) -> None:
     await smtp_client.login(settings.email.username, settings.email.password)
     await smtp_client.sendmail(settings.email.sender_email, to, msg.as_string())
     await smtp_client.quit()
-
-
-async def send_delete_email(email: str) -> None:
-    body = textwrap.dedent(
-        """
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>your account has been deleted</code></h2>
-        """
-    )
-
-    await send_email(subject="Account Deleted", body=body, to=email)
-
-
-async def send_waitlist_email(email: str) -> None:
-    body = textwrap.dedent(
-        """
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>you're on the waitlist!</code></h2>
-            <p>Thanks for signing up! We'll let you know when you can log in.</p>
-        """
-    )
-
-    await send_email(subject="Waitlist", body=body, to=email)
 
 
 def test_email_adhoc() -> None:
