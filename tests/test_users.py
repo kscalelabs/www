@@ -95,17 +95,17 @@ async def test_oauth_signup_notifications(app_client: AsyncClient, mock_send_ema
     mock_send_email.assert_called_with(
         subject="Welcome to K-Scale Labs",
         body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
-        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+        to="github-user@kscale.dev",  # Mock GitHub user email
     )
 
     # Reset mock for next test
     mock_send_email.reset_mock()
 
-    # Test Google signup (should use same email from mock)
+    # Test Google signup with different user
     response = await app_client.post("/auth/google/code", json={"code": "test_code"})
     assert response.status_code == status.HTTP_200_OK, response.json()
     mock_send_email.assert_called_with(
         subject="Welcome to K-Scale Labs",
         body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
-        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+        to="google-user@kscale.dev",  # Mock Google user email
     )
