@@ -53,7 +53,7 @@ def test_user_auth_functions(test_client: TestClient, mock_send_email: MockType)
     mock_send_email.assert_called_with(
         subject="Account Deleted - K-Scale Labs",
         body=mock_send_email.call_args[1]["body"],  # Don't compare exact HTML
-        to="dchen@kscale.dev",  # This is the mock email from conftest.py
+        to="github-user@kscale.dev",  # Using consistent mock email from GitHub OAuth
     )
 
     # Tries deleting the user again, which should fail.

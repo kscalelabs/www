@@ -123,7 +123,7 @@ def mock_github_email(mocker: MockerFixture) -> MockType:
 
 
 @pytest.fixture(autouse=True)
-def mock_google_email(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.google.google_email_req")
-    mock.return_value = Response(status_code=200, json={"email": "google-user@kscale.dev"})
+def mock_google_user_data(mocker: MockerFixture) -> MockType:
+    mock = mocker.patch("www.app.routers.auth.google.get_google_user_data")
+    mock.return_value = {"email": "google-user@kscale.dev", "given_name": "Test", "family_name": "User"}
     return mock
