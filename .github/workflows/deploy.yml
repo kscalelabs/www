@@ -4,18 +4,21 @@ on:
   push:
     branches:
       - master
+      - staging
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: deploy
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+
+    environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
 
     steps:
       - name: Checkout repository
@@ -36,8 +39,8 @@ jobs:
 
       - name: Build and push Docker image
         env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_WWW }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_WWW }}
+          ECR_REGISTRY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REGISTRY_WWW || secrets.ECR_REGISTRY_WWW_STAGING }}
+          ECR_REPOSITORY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REPOSITORY_WWW || secrets.ECR_REPOSITORY_WWW_STAGING }}
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
@@ -45,7 +48,7 @@ jobs:
 
       - name: Download task definition
         run: |
-          aws ecs describe-task-definition --task-definition ${{ secrets.ECS_TASK_DEFINITION_WWW }} \
+          aws ecs describe-task-definition --task-definition ${{ github.ref == 'refs/heads/master' && secrets.ECS_TASK_DEFINITION_WWW || secrets.ECS_TASK_DEFINITION_WWW_STAGING }} \
           --query taskDefinition > task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
@@ -53,13 +56,13 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{ secrets.CONTAINER_NAME_WWW }}
-          image: ${{ secrets.ECR_REGISTRY_WWW }}/${{ secrets.ECR_REPOSITORY_WWW }}:latest
+          container-name: ${{ github.ref == 'refs/heads/master' && secrets.CONTAINER_NAME_WWW || secrets.CONTAINER_NAME_WWW_STAGING }}
+          image: ${{ github.ref == 'refs/heads/master' && format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW, secrets.ECR_REPOSITORY_WWW) || format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW_STAGING, secrets.ECR_REPOSITORY_WWW_STAGING) }}
 
       - name: Deploy Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE_WWW }}
-          cluster: ${{ secrets.ECS_CLUSTER_WWW }}
+          service: ${{ github.ref == 'refs/heads/master' && secrets.ECS_SERVICE_WWW || secrets.ECS_SERVICE_WWW_STAGING }}
+          cluster: ${{ github.ref == 'refs/heads/master' && secrets.ECS_CLUSTER_WWW || secrets.ECS_CLUSTER_WWW_STAGING }}
           wait-for-service-stability: true
