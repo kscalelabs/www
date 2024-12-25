@@ -84,3 +84,4 @@ class EnvironmentSettings:
     cloudfront: CloudFrontSettings = field(default_factory=CloudFrontSettings)
     debug: bool = field(default=False)
     environment: str = field(default="local")
+    enable_test_endpoint: bool = field(default=False)
