@@ -93,19 +93,6 @@ class User(StoreBaseModel):
         self.update_timestamp()
 
 
-class EmailSignUpToken(StoreBaseModel):
-    """Object created when user attempts to sign up with email.
-
-    Will be checked by signup dynamic route to render SignupForm if authorized.
-    """
-
-    email: str
-
-    @classmethod
-    def create(cls, email: str) -> Self:
-        return cls(id=new_uuid(), email=email)
-
-
 class OAuthKey(StoreBaseModel):
     """Keys for OAuth providers which identify users."""
 
