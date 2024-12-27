@@ -30,63 +30,58 @@ async def send_email(subject: str, body: str, to: str) -> None:
     await smtp_client.quit()
 
 
-async def send_signup_email(email: str, token: str) -> None:
-    body = textwrap.dedent(
-        f"""
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>register</code></h2>
-            <p>Click <a href="{settings.site.homepage}/signup/{token}">here</a> to continue registration.</p>
-        """
-    )
-
-    await send_email(subject="Signup", body=body, to=email)
-
-
-async def send_reset_password_email(email: str, token: str) -> None:
-    body = textwrap.dedent(
-        f"""
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>reset your password</code></h2>
-            <p>Click <a href="{settings.site.homepage}/reset-password/{token}">here</a> to reset your password.</p>
-        """
-    )
-
-    await send_email(subject="Reset Password", body=body, to=email)
-
-
-async def send_change_email(email: str, token: str) -> None:
-    body = textwrap.dedent(
-        f"""
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>change your email</code></h2>
-            <p>Click <a href="{settings.site.homepage}/change-email/{token}">here</a> to change your email.</p>
-        """
-    )
-
-    await send_email(subject="Change Email", body=body, to=email)
-
-
 async def send_delete_email(email: str) -> None:
+    """Send an email notification when a user's account is deleted.
+
+    Args:
+        email: The email address of the user whose account was deleted.
+    """
     body = textwrap.dedent(
         """
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>your account has been deleted</code></h2>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">K-Scale Labs</h1>
+            <h2 style="color: #666;">Your account has been deleted</h2>
+            <p style="color: #444; line-height: 1.6;">
+                We're sorry to see you go. Your account and associated data have been successfully deleted from our
+                system.
+            </p>
+            <p style="color: #444; line-height: 1.6;">
+                If you have any questions or if this was done in error, please contact our support team.
+            </p>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
+                <p>This is an automated message, please do not reply directly to this email.</p>
+            </div>
+        </div>
         """
     )
+    await send_email(subject="Account Deleted - K-Scale Labs", body=body, to=email)
 
-    await send_email(subject="Account Deleted", body=body, to=email)
 
+async def send_signup_notification_email(email: str) -> None:
+    """Send a welcome email notification when a user signs up via OAuth.
 
-async def send_waitlist_email(email: str) -> None:
+    Args:
+        email: The email address of the newly registered user.
+    """
     body = textwrap.dedent(
         """
-            <h1><code>K-Scale Labs</code></h1>
-            <h2><code>you're on the waitlist!</code></h2>
-            <p>Thanks for signing up! We'll let you know when you can log in.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">K-Scale Labs</h1>
+            <h2 style="color: #666;">Welcome to K-Scale Labs!</h2>
+            <p style="color: #444; line-height: 1.6;">
+                Thank you for joining our community. Your account has been successfully created using OAuth
+                authentication.
+            </p>
+            <p style="color: #444; line-height: 1.6;">
+                We're excited to have you on board and look forward to helping you make the most of our services.
+            </p>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
+                <p>This is an automated message, please do not reply directly to this email.</p>
+            </div>
+        </div>
         """
     )
-
-    await send_email(subject="Waitlist", body=body, to=email)
+    await send_email(subject="Welcome to K-Scale Labs", body=body, to=email)
 
 
 def test_email_adhoc() -> None:

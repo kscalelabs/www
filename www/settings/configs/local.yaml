@@ -7,6 +7,10 @@ s3:
   prefix: media/
 dynamo:
   table_name: kscale-store-local
+cloudfront:
+  domain: ${site.artifact_base_url}
+  key_id: null
+  private_key: null
 site:
   homepage: http://127.0.0.1:3000
   artifact_base_url: http://127.0.0.1:4566/artifacts/media/

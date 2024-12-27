@@ -11,7 +11,7 @@ aioboto3
 
 # Crypto dependencies
 argon2-cffi
-pyjwt[asyncio]
+pyjwt
 bcrypt
 cryptography
 
@@ -38,3 +38,4 @@ types-aioboto3[dynamodb, s3]
 pybullet
 mujoco
 kscale-onshape-library[all]
+krec

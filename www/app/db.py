@@ -7,7 +7,6 @@ from typing import AsyncGenerator, Literal, Self
 
 from www.app.crud.artifacts import ArtifactsCrud
 from www.app.crud.base import TABLE_NAME, BaseCrud
-from www.app.crud.email import EmailCrud
 from www.app.crud.krecs import KRecsCrud
 from www.app.crud.listings import ListingsCrud
 from www.app.crud.onshape import OnshapeCrud
@@ -18,7 +17,6 @@ from www.app.crud.users import UserCrud
 
 class Crud(
     OnshapeCrud,
-    EmailCrud,
     UserCrud,
     ListingsCrud,
     ArtifactsCrud,

@@ -39,6 +39,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _get_cloudfront_signer() -> CloudFrontUrlSigner | None:
+    cld = settings.cloudfront
+    if cld.key_id is None or cld.private_key is None:
+        assert cld.key_id is None and cld.private_key is None, "Both key_id and private_key must be set!"
+        return None
+    return CloudFrontUrlSigner(key_id=cld.key_id, private_key=cld.private_key)
+
+
 @router.get("/url/{artifact_type}/{listing_id}/{name}")
 async def artifact_url(
     artifact_type: ArtifactType,
@@ -64,18 +72,15 @@ async def artifact_url(
     _, file_extension = os.path.splitext(name)
     s3_filename = f"{artifact.id}{file_extension}"
 
-    # Initialize CloudFront signer
-    signer = CloudFrontUrlSigner(
-        key_id=settings.cloudfront.key_id,
-        private_key=settings.cloudfront.private_key,
-    )
-
     # Always use CloudFront domain and sign the URL
     base_url = f"https://{settings.cloudfront.domain}/{artifact.artifact_type}/{listing_id}/{s3_filename}"
     if size and artifact.artifact_type == "image":
         base_url = f"{base_url}_{size}"
 
     # Create and sign URL
+    signer = _get_cloudfront_signer()
+    if signer is None:
+        return RedirectResponse(url=base_url)
     policy = signer.create_custom_policy(url=base_url, expire_days=180)
     signed_url = signer.generate_presigned_url(base_url, policy=policy)
 
@@ -92,15 +97,9 @@ def get_artifact_url_response(artifact: Artifact) -> ArtifactUrls:
     artifact_urls = get_artifact_urls(artifact=artifact)
     expiration_time = None
 
-    # If in production, sign both URLs
-    if settings.environment != "local":
+    signer = _get_cloudfront_signer()
+    if signer is not None:
         logger.debug("Original URLs for artifact %s: %s", artifact.id, artifact_urls)
-
-        signer = CloudFrontUrlSigner(
-            key_id=settings.cloudfront.key_id,
-            private_key=settings.cloudfront.private_key,
-        )
-
         expire_days = 180
         expiration_time = int((datetime.utcnow() + timedelta(days=expire_days)).timestamp())
 

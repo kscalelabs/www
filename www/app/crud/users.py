@@ -21,6 +21,7 @@ from www.app.model import (
     User,
     UserPermission,
 )
+from www.app.utils.email import send_signup_notification_email
 from www.settings import settings
 from www.utils import cache_async_result
 
@@ -121,6 +122,7 @@ class UserCrud(BaseCrud):
                 elif provider == "google":
                     user.google_id = user_token
                 await self._add_item(user, unique_fields=["email", "username"])
+                await send_signup_notification_email(email)
             elif provider == "github":
                 await self._update_item(user.id, User, {"github_id": user_token})
             elif provider == "google":
@@ -128,6 +130,7 @@ class UserCrud(BaseCrud):
 
             oauth_key = OAuthKey.create(user_id=user.id, provider=provider, user_token=user_token)
             await self._add_item(oauth_key, unique_fields=["user_token"])
+
             return user
         except Exception as e:
             logger.exception("Error in _create_user_from_oauth: %s", e)
@@ -166,7 +169,10 @@ class UserCrud(BaseCrud):
         await self._delete_item(await self._get_oauth_key(github_auth_key(github_id), throw_if_missing=True))
 
     async def get_user_from_google_token(
-        self, email: str, first_name: Optional[str] = None, last_name: Optional[str] = None
+        self,
+        email: str,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
     ) -> User:
         try:
             auth_key = google_auth_key(email)
@@ -192,6 +198,18 @@ class UserCrud(BaseCrud):
         return await self._get_item(api_key.user_id, User, throw_if_missing=True)
 
     async def delete_user(self, id: str) -> None:
+        async def delete_api_keys() -> None:
+            api_keys = await self.list_api_keys(id)
+            await asyncio.gather(*[self.delete_api_key(key) for key in api_keys])
+
+        async def delete_oauth_keys() -> None:
+            oauth_keys = await self._get_items_from_secondary_index("user_id", id, OAuthKey)
+            await asyncio.gather(*[self._delete_item(key) for key in oauth_keys])
+
+        # Delete the user's API keys and OAuth keys.
+        await asyncio.gather(delete_api_keys(), delete_oauth_keys())
+
+        # Delete the user itself.
         await self._delete_item(id)
 
     async def list_users(self) -> list[User]:

@@ -202,8 +202,6 @@ async def get_public_user_info_by_id_endpoint(
 
 
 class UpdateUserRequest(BaseModel):
-    email: str | None = None
-    password: str | None = None
     github_id: str | None = None
     google_id: str | None = None
     first_name: str | None = None
