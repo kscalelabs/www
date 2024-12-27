@@ -39,8 +39,8 @@ jobs:
 
       - name: Build and push Docker image
         env:
-          ECR_REGISTRY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REGISTRY_WWW || secrets.ECR_REGISTRY_WWW_STAGING }}
-          ECR_REPOSITORY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REPOSITORY_WWW || secrets.ECR_REPOSITORY_WWW_STAGING }}
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_WWW }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_WWW }}
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
@@ -48,21 +48,22 @@ jobs:
 
       - name: Download task definition
         run: |
-          aws ecs describe-task-definition --task-definition ${{ github.ref == 'refs/heads/master' && secrets.ECS_TASK_DEFINITION_WWW || secrets.ECS_TASK_DEFINITION_WWW_STAGING }} \
-          --query taskDefinition > task-definition.json
+          aws ecs describe-task-definition \
+            --task-definition ${{ secrets.ECS_TASK_DEFINITION_WWW }} \
+            --query taskDefinition > task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{ github.ref == 'refs/heads/master' && secrets.CONTAINER_NAME_WWW || secrets.CONTAINER_NAME_WWW_STAGING }}
-          image: ${{ github.ref == 'refs/heads/master' && format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW, secrets.ECR_REPOSITORY_WWW) || format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW_STAGING, secrets.ECR_REPOSITORY_WWW_STAGING) }}
+          container-name: ${{ secrets.CONTAINER_NAME_WWW }}
+          image: ${{ format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW, secrets.ECR_REPOSITORY_WWW) }}
 
       - name: Deploy Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ github.ref == 'refs/heads/master' && secrets.ECS_SERVICE_WWW || secrets.ECS_SERVICE_WWW_STAGING }}
-          cluster: ${{ github.ref == 'refs/heads/master' && secrets.ECS_CLUSTER_WWW || secrets.ECS_CLUSTER_WWW_STAGING }}
+          service: ${{ secrets.ECS_SERVICE_WWW }}
+          cluster: ${{ secrets.ECS_CLUSTER_WWW }}
           wait-for-service-stability: true
