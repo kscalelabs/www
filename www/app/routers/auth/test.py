@@ -18,7 +18,7 @@ class TestAuthResponse(BaseModel):
     token: str
 
 
-@router.post("/test", response_model=TestAuthResponse)
+@router.post("/auth", response_model=TestAuthResponse)
 async def test_auth_endpoint(user_crud: Annotated[UserCrud, Depends()]) -> TestAuthResponse:
     """Authenticates as a test user in staging environment.
 
