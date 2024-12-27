@@ -60,7 +60,7 @@ jobs:
           image: ${{ format('{0}/{1}:latest', vars.ECR_REGISTRY_WWW, vars.ECR_REPOSITORY_WWW) }}
 
       - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ vars.ECS_SERVICE_WWW }}

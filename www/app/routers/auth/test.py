@@ -2,11 +2,10 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from www.app.crud.users import UserCrud
-from www.settings import settings
 
 router = APIRouter()
 
@@ -25,13 +24,6 @@ async def test_auth_endpoint(user_crud: Annotated[UserCrud, Depends()]) -> TestA
     This endpoint is only available in development and staging environments.
     It creates (or reuses) a test user account and returns authentication credentials.
     """
-    # Only allow when test endpoint is enabled
-    if not settings.enable_test_endpoint:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Test auth endpoint not available (enable_test_endpoint is false)",
-        )
-
     # Attempt to find or create the test user
     test_email = "dummytest@staging.local"
     test_password = "dummy-test-password-123"  # Password doesn't matter as we use API key

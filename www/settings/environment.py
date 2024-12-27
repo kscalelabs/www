@@ -62,6 +62,7 @@ class DynamoSettings:
 class SiteSettings:
     homepage: str = field(default=MISSING)
     artifact_base_url: str = field(default=MISSING)
+    enable_test_endpoint: bool = field(default=False)
 
 
 @dataclass
@@ -84,4 +85,3 @@ class EnvironmentSettings:
     cloudfront: CloudFrontSettings = field(default_factory=CloudFrontSettings)
     debug: bool = field(default=False)
     environment: str = field(default="local")
-    enable_test_endpoint: bool = field(default=False)
