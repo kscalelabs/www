@@ -41,10 +41,9 @@ jobs:
         env:
           ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
-          IMAGE_TAG: latest
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f docker/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Download task definition
         run: |
