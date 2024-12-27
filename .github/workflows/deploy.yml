@@ -39,13 +39,12 @@ jobs:
 
       - name: Build and push Docker image
         env:
+          ECR_REGISTRY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REGISTRY_WWW || secrets.ECR_REGISTRY_WWW_STAGING }}
+          ECR_REPOSITORY: ${{ github.ref == 'refs/heads/master' && secrets.ECR_REPOSITORY_WWW || secrets.ECR_REPOSITORY_WWW_STAGING }}
           IMAGE_TAG: latest
         run: |
-          docker build \
-            -t "${{ github.ref == 'refs/heads/master' && secrets.ECR_REGISTRY_WWW || secrets.ECR_REGISTRY_WWW_STAGING }}/${{ github.ref == 'refs/heads/master' && secrets.ECR_REPOSITORY_WWW || secrets.ECR_REPOSITORY_WWW_STAGING }}:$IMAGE_TAG" \
-            -f docker/Dockerfile .
-
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Download task definition
         run: |
