@@ -30,8 +30,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.AWS_ROLE_NAME }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Log in to Amazon ECR
         id: login-ecr
@@ -39,8 +39,8 @@ jobs:
 
       - name: Build and push Docker image
         env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_WWW }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_WWW }}
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
@@ -57,13 +57,13 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{ secrets.CONTAINER_NAME_WWW }}
-          image: ${{ format('{0}/{1}:latest', secrets.ECR_REGISTRY_WWW, secrets.ECR_REPOSITORY_WWW) }}
+          container-name: ${{ vars.CONTAINER_NAME_WWW }}
+          image: ${{ format('{0}/{1}:latest', vars.ECR_REGISTRY_WWW, vars.ECR_REPOSITORY_WWW) }}
 
       - name: Deploy Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE_WWW }}
-          cluster: ${{ secrets.ECS_CLUSTER_WWW }}
+          service: ${{ vars.ECS_SERVICE_WWW }}
+          cluster: ${{ vars.ECS_CLUSTER_WWW }}
           wait-for-service-stability: true
