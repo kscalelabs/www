@@ -67,8 +67,8 @@ class SiteSettings:
 @dataclass
 class CloudFrontSettings:
     domain: str = field(default=II("oc.env:CLOUDFRONT_DOMAIN"))
-    key_id: str = field(default=II("oc.env:CLOUDFRONT_KEY_ID"))
-    private_key: str = field(default=II("oc.env:CLOUDFRONT_PRIVATE_KEY"))
+    key_id: str | None = field(default=II("oc.env:CLOUDFRONT_KEY_ID"))
+    private_key: str | None = field(default=II("oc.env:CLOUDFRONT_PRIVATE_KEY"))
 
 
 @dataclass

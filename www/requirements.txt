@@ -38,3 +38,4 @@ types-aioboto3[dynamodb, s3]
 pybullet
 mujoco
 kscale-onshape-library[all]
+krec

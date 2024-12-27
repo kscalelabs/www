@@ -18,7 +18,7 @@ import aioboto3
 from aiobotocore.response import StreamingBody
 from boto3.dynamodb.conditions import Attr, ComparisonCondition, Key
 from botocore.exceptions import ClientError
-from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource
+from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 from types_aiobotocore_s3.service_resource import S3ServiceResource
 
 from www.app.errors import InternalError, ItemNotFoundError
@@ -59,6 +59,10 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             raise RuntimeError("Must call __aenter__ first!")
         return self.__s3
 
+    @property
+    async def table(self) -> Table:
+        return await self.db.Table(TABLE_NAME)
+
     @classmethod
     def get_gsis(cls) -> set[str]:
         return {"type"}
@@ -85,7 +89,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         await asyncio.gather(*(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close))
 
     async def _add_item(self, item: StoreBaseModel, unique_fields: list[str] | None = None) -> None:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         item_data = item.model_dump()
 
         # Ensure no empty strings are present
@@ -116,7 +120,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             raise
 
     async def _delete_item(self, item: StoreBaseModel | str) -> None:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         await table.delete_item(Key={"id": item if isinstance(item, str) else item.id})
 
     async def _list_items(
@@ -128,7 +132,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         offset: int | None = None,
         limit: int = DEFAULT_SCAN_LIMIT,
     ) -> list[T]:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
 
         query_params = {
             "IndexName": "type_index",
@@ -206,7 +210,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         return sorted_items[(page - 1) * ITEMS_PER_PAGE : page * ITEMS_PER_PAGE], page * ITEMS_PER_PAGE < len(response)
 
     async def _count_items(self, item_class: type[T]) -> int:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         item_dict = await table.scan(
             IndexName="type_index",
             Select="COUNT",
@@ -236,7 +240,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
     ) -> T | None: ...
 
     async def _get_item(self, item_id: str, item_class: type[T], throw_if_missing: bool = False) -> T | None:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         item_dict = await table.get_item(Key={"id": item_id})
         if "Item" not in item_dict:
             if throw_if_missing:
@@ -246,7 +250,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         return self._validate_item(item_data, item_class)
 
     async def _item_exists(self, item_id: str) -> bool:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         item_dict = await table.get_item(Key={"id": item_id})
         return "Item" in item_dict
 
@@ -283,7 +287,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         filter_expression: ComparisonCondition = Key("type").eq(item_class.__name__)
         if additional_filter_expression is not None:
             filter_expression &= additional_filter_expression
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         item_dict = await table.query(
             IndexName=self.get_gsi_index_name(secondary_index_name),
             KeyConditionExpression=Key(secondary_index_name).eq(secondary_index_value),
@@ -310,7 +314,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         chunk_size: int = DEFAULT_CHUNK_SIZE,
     ) -> list[list[T]]:
         items: list[list[T]] = []
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
 
         for i in range(0, len(secondary_index_values), chunk_size):
             chunk = secondary_index_values[i : i + chunk_size]
@@ -550,7 +554,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             logger.info("Table %s does not exist", name)
 
     async def _get_by_known_id(self, record_id: str) -> dict[str, Any] | None:
-        table = await self.db.Table(TABLE_NAME)
+        table = await self.table
         response = await table.get_item(Key={"id": record_id})
         return response.get("Item")
 

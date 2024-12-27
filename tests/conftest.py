@@ -111,7 +111,7 @@ def mock_github_access_token(mocker: MockerFixture) -> MockType:
 @pytest.fixture(autouse=True)
 def mock_github(mocker: MockerFixture) -> MockType:
     mock = mocker.patch("www.app.routers.auth.github.github_req")
-    mock.return_value = Response(status_code=200, json={"html_url": "https://github.com/chennisden"})
+    mock.return_value = Response(status_code=200, json={"html_url": "https://github.com/kscalelabs"})
     return mock
 
 

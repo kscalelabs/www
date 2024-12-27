@@ -1,5 +1,8 @@
 # requirements-dev.txt
 
+# Miscellaneous dependencies.
+setuptools
+
 # Linting
 black
 darglint
@@ -15,6 +18,3 @@ pytest-timeout
 pytest-trio
 s3fs
 flask-cors
-
-# K-Scale dependencies
-krec

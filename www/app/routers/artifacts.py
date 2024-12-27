@@ -64,18 +64,20 @@ async def artifact_url(
     _, file_extension = os.path.splitext(name)
     s3_filename = f"{artifact.id}{file_extension}"
 
-    # Initialize CloudFront signer
-    signer = CloudFrontUrlSigner(
-        key_id=settings.cloudfront.key_id,
-        private_key=settings.cloudfront.private_key,
-    )
+    cld = settings.cloudfront
+    domain, key_id, private_key = cld.domain, cld.key_id, cld.private_key
 
     # Always use CloudFront domain and sign the URL
-    base_url = f"https://{settings.cloudfront.domain}/{artifact.artifact_type}/{listing_id}/{s3_filename}"
+    base_url = f"https://{domain}/{artifact.artifact_type}/{listing_id}/{s3_filename}"
     if size and artifact.artifact_type == "image":
         base_url = f"{base_url}_{size}"
 
+    if key_id is None or private_key is None:
+        assert key_id is None and private_key is None, "Both key and private key must be set!"
+        return RedirectResponse(url=base_url)
+
     # Create and sign URL
+    signer = CloudFrontUrlSigner(key_id=key_id, private_key=private_key)
     policy = signer.create_custom_policy(url=base_url, expire_days=180)
     signed_url = signer.generate_presigned_url(base_url, policy=policy)
 
