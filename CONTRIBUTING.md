@@ -235,6 +235,5 @@ Finally, run the image with port 8080 exposed:
 ```bash
 docker run \
   -p 8080:8080 \
-  -e ENVIRONMENT='staging' \
   725596835855.dkr.ecr.us-east-1.amazonaws.com/www-staging:latest
 ```
