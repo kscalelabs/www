@@ -226,7 +226,8 @@ aws ecr get-login-password --region us-east-1 --profile kscale | docker login \
 Next, pull the latest image:
 
 ```bash
-docker pull 725596835855.dkr.ecr.us-east-1.amazonaws.com/www:latest
+docker pull 725596835855.dkr.ecr.us-east-1.amazonaws.com/www:latest  # Production
+docker pull 725596835855.dkr.ecr.us-east-1.amazonaws.com/www-staging:latest  # Staging
 ```
 
 Finally, run the image with port 8080 exposed:
@@ -235,5 +236,5 @@ Finally, run the image with port 8080 exposed:
 docker run \
   -p 8080:8080 \
   -e ENVIRONMENT='staging' \
-  725596835855.dkr.ecr.us-east-1.amazonaws.com/www:latest
+  725596835855.dkr.ecr.us-east-1.amazonaws.com/www-staging:latest
 ```

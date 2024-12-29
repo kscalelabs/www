@@ -41,6 +41,10 @@ jobs:
         env:
           ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
+          ENVIRONMENT: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f docker/Dockerfile .
+          docker build \
+            --build-arg ENVIRONMENT=${ENVIRONMENT}
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f docker/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest

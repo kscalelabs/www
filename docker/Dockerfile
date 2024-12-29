@@ -5,6 +5,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ARG ENVIRONMENT
+
+ENV ENVIRONMENT=${ENVIRONMENT}
+
 # Copy the requirements file first to leverage Docker's cache.
 COPY /www/requirements.txt /app
 
