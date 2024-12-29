@@ -1,5 +1,3 @@
-crypto:
-  jwt_secret: ${oc.env:JWT_SECRET}
 dynamo:
   table_name: kscale-www-staging-cluster
 site:

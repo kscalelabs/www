@@ -6,6 +6,11 @@ from omegaconf import II, MISSING
 
 
 @dataclass
+class MiddlewareSettings:
+    secret_key: str = field(default=II("oc.env:MIDDLEWARE_SECRET_KEY"))
+
+
+@dataclass
 class OauthSettings:
     github_client_id: str = field(default=II("oc.env:GITHUB_CLIENT_ID"))
     github_client_secret: str = field(default=II("oc.env:GITHUB_CLIENT_SECRET"))
@@ -17,7 +22,6 @@ class OauthSettings:
 class CryptoSettings:
     cache_token_db_result_seconds: int = field(default=30)
     expire_otp_minutes: int = field(default=10)
-    jwt_secret: str = field(default=MISSING)
     algorithm: str = field(default="HS256")
 
 
@@ -74,6 +78,7 @@ class CloudFrontSettings:
 
 @dataclass
 class EnvironmentSettings:
+    middleware: MiddlewareSettings = field(default_factory=MiddlewareSettings)
     oauth: OauthSettings = field(default_factory=OauthSettings)
     user: UserSettings = field(default_factory=UserSettings)
     crypto: CryptoSettings = field(default_factory=CryptoSettings)

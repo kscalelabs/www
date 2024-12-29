@@ -2,16 +2,15 @@
 
 # Standard dependencies.
 omegaconf
-bson
 pydantic
-email-validator
+
+# Authentication
+authlib
 
 # AWS dependencies.
 aioboto3
 
 # Crypto dependencies
-argon2-cffi
-pyjwt
 bcrypt
 cryptography
 

@@ -8,7 +8,8 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyCookie, APIKeyHeader
+from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2AuthorizationCodeBearer
+from starlette.middleware.sessions import SessionMiddleware
 
 from www.app.db import create_tables
 from www.app.errors import (
@@ -27,6 +28,7 @@ from www.app.routers.onshape import router as onshape_router
 from www.app.routers.robots import router as robots_router
 from www.app.routers.teleop import router as teleop_router
 from www.app.routers.users import router as users_router
+from www.settings import settings
 from www.utils import get_cors_origins
 
 
@@ -61,6 +63,20 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add authentication middleware.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.middleware.secret_key,
+)
+
+oauth2_scheme = OAuth2AuthorizationCodeBearer(
+    authorizationUrl="https://accounts.google.com/o/oauth2/auth",
+    tokenUrl="https://accounts.google.com/o/oauth2/token",
+    refreshUrl="https://accounts.google.com/o/oauth2/token",
+    scopes={"openid": "Access your OpenAI information"},
+    auto_error=False,
 )
 
 

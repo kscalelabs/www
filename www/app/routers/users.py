@@ -186,8 +186,8 @@ async def get_user_info_by_id_endpoint(id: str, crud: Annotated[Crud, Depends(Cr
 @router.get("/public/me", response_model=UserPublic)
 async def get_my_public_user_info_endpoint(
     user: User = Depends(get_session_user_with_read_permission),
-) -> UserPublic:  # Change return type to UserPublic
-    return UserPublic(**user.model_dump())  # Return UserPublic instance directly
+) -> UserPublic:
+    return UserPublic(**user.model_dump())
 
 
 @router.get("/public/{id}", response_model=UserPublic)
