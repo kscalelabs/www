@@ -49,7 +49,7 @@ api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 app = FastAPI(
     title="K-Scale",
     version="1.0.0",
-    docs_url="/docs",
+    docs_url="/",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
@@ -110,11 +110,6 @@ async def bad_artifact_exception_handler(request: Request, exc: BadArtifactError
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"message": f"Bad artifact: {exc}", "detail": str(exc)},
     )
-
-
-@app.get("/")
-async def read_root() -> bool:
-    return True
 
 
 async def validate_auth_token(auth_token: str = Depends(api_key_header)) -> str:
