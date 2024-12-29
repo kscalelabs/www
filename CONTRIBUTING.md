@@ -200,42 +200,6 @@ Serve the FastAPI application in development mode:
 make start
 ```
 
-## Syncing Frontend and Backend
-
-After updating the backend API, regenerate the API client by running the following from the `frontend` directory:
-
-```bash
-openapi-typescript http://localhost:8080/openapi.json --output src/gen/api.ts  # While running the backend API locally
-```
-
-## React Setup
-
-Install React dependencies using [nvm](https://github.com/nvm-sh/nvm) and [npm](https://www.npmjs.com/):
-
-```bash
-cd frontend
-nvm use 20.10.0
-npm install
-```
-
-Serve the React frontend in development mode:
-
-```bash
-npm run dev
-```
-
-Build the React frontend for production:
-
-```bash
-npm run build
-```
-
-Run code formatting:
-
-```bash
-npm run format
-```
-
 ## Testing
 
 To run tests, use the following commands:
@@ -248,30 +212,28 @@ To run tests, use the following commands:
 make test
 ```
 
-## Optional
+### Testing Docker Container
 
-Install pre-commit from [here](https://pre-commit.com/) to run the formatting and static checks automatically when you commit.
+To test the Docker container that was pushed to AWS, first authenticate:
 
-Here's the pre-commit yaml configuration:
+```bash
+aws ecr get-login-password --region us-east-1 --profile kscale | docker login \
+  --username AWS \
+  --password-stdin \
+  725596835855.dkr.ecr.us-east-1.amazonaws.com  # Our ECR repository
+```
 
-```yaml
-fail_fast: true
-repos:
-  - repo: local
-    hooks:
-      - id: format
-        name: Format
-        entry: bash -c 'make format || (echo "❌ Formatting failed. Please run make format manually and commit the changes." && exit 1) && git diff --exit-code || (echo "❌ Formatting failed but formatted file. Please add and commit again." && exit 1)'
-        language: system
-        pass_filenames: false
-      - id: static-checks
-        name: Static Checks
-        entry: bash -c 'make static-checks || (echo "❌ Static checks failed. Please fix the issues and try again." && exit 1)'
-        language: system
-        pass_filenames: false
-      - id: test
-        name: Run Tests
-        entry: bash -c 'make test || (echo "❌ Tests failed. Please fix the failing tests and try again." && exit 1)'
-        language: system
-        pass_filenames: false
+Next, pull the latest image:
+
+```bash
+docker pull 725596835855.dkr.ecr.us-east-1.amazonaws.com/www:latest
+```
+
+Finally, run the image with port 8080 exposed:
+
+```bash
+docker run \
+  -p 8080:8080 \
+  -e ENVIRONMENT='staging' \
+  725596835855.dkr.ecr.us-east-1.amazonaws.com/www:latest
 ```
