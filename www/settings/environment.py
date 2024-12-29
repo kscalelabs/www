@@ -12,10 +12,10 @@ class MiddlewareSettings:
 
 @dataclass
 class OauthSettings:
-    github_client_id: str = field(default=II("oc.env:GITHUB_CLIENT_ID"))
-    github_client_secret: str = field(default=II("oc.env:GITHUB_CLIENT_SECRET"))
-    google_client_id: str = field(default=II("oc.env:GOOGLE_CLIENT_ID"))
-    google_client_secret: str = field(default=II("oc.env:GOOGLE_CLIENT_SECRET"))
+    cognito_authority = field(default=II("oc.env:COGNITO_AUTHORITY"))
+    cognito_client_id = field(default=II("oc.env:COGNITO_CLIENT_ID"))
+    cognito_client_secret = field(default=II("oc.env:COGNITO_CLIENT_SECRET"))
+    cognito_metadata_url = field(default=II("oc.env:COGNITO_METADATA_URL"))
 
 
 @dataclass
