@@ -44,7 +44,7 @@ jobs:
           ENVIRONMENT: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
         run: |
           docker build \
-            --build-arg ENVIRONMENT=${ENVIRONMENT}
+            --build-arg ENVIRONMENT=${ENVIRONMENT} \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -f docker/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
