@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import APIKeyCookie, APIKeyHeader
 
 from www.app.db import create_tables
@@ -49,8 +49,8 @@ api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 app = FastAPI(
     title="K-Scale",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/",  # New location for Swagger UI
+    redoc_url=None,  # Disable Redoc UI
     openapi_url="/openapi.json",
 )
 
@@ -112,9 +112,16 @@ async def bad_artifact_exception_handler(request: Request, exc: BadArtifactError
     )
 
 
-@app.get("/")
-async def read_root() -> bool:
+@app.get("/health")
+async def health_check() -> bool:
+    """Health check endpoint that returns True if the service is running."""
     return True
+
+
+@app.get("/docs", include_in_schema=False)
+async def docs_redirect() -> RedirectResponse:
+    """Redirect /docs to the root path where Swagger UI is now served."""
+    return RedirectResponse(url="/")
 
 
 async def validate_auth_token(auth_token: str = Depends(api_key_header)) -> str:
