@@ -17,7 +17,6 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-latest
-
     environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
 
     steps:

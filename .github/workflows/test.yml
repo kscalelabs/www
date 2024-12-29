@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - master
+      - staging
   pull_request:
     branches:
       - master
+      - staging
     types:
       - opened
       - reopened
@@ -21,7 +23,7 @@ jobs:
   run-tests:
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
 
     env:
       JWT_SECRET: test
