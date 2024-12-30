@@ -24,7 +24,6 @@ from types_aiobotocore_s3.service_resource import S3ServiceResource
 from www.app.errors import InternalError, ItemNotFoundError
 from www.app.model import StoreBaseModel
 from www.settings import settings
-from www.utils import get_cors_origins
 
 TABLE_NAME = settings.dynamo.table_name
 
@@ -465,7 +464,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
                         {
                             "AllowedHeaders": ["*"],
                             "AllowedMethods": ["GET"],
-                            "AllowedOrigins": get_cors_origins(),
+                            "AllowedOrigins": ["*"],
                             "ExposeHeaders": ["ETag"],
                         }
                     ]

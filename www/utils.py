@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Awaitable, Callable, Generic, Hashable, ParamSpec, TypeVar, overload
 from xml.etree import ElementTree as ET
 
-from www.settings import settings
-
 Tk = TypeVar("Tk", bound=Hashable)
 Tv = TypeVar("Tv")
 P = ParamSpec("P")
@@ -177,17 +175,3 @@ def save_xml(path: str | Path | io.BytesIO, tree: ET.ElementTree) -> None:
 
     indent(root)
     tree.write(path, encoding="utf-8", xml_declaration=True, method="xml")
-
-
-LOCALHOST_URLS = [
-    "http://127.0.0.1:3000",
-    "http://localhost:3000",
-]
-PRODUCTION_URLS = [
-    "https://dashboard.kscale.dev",
-    "https://www.dashboard.kscale.dev",
-]
-
-
-def get_cors_origins() -> list[str]:
-    return list({settings.site.homepage, *LOCALHOST_URLS, *PRODUCTION_URLS})

@@ -1,0 +1,25 @@
+<html>
+
+<head>
+  <title>K-Scale API</title>
+  <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+</head>
+
+<body>
+  <h1>K-Scale API</h1>
+  <p>This is a test of the emergency preparedness system.</p>
+  <ul>
+    <li>
+      {% if is_authenticated %}
+      <a href="/auth/logout">Logout</a>
+      {% else %}
+      <a href="/auth/login">Login</a>
+      {% endif %}
+    </li>
+    <li>
+      <a href="/docs">API Documentation</a>
+    </li>
+  </ul>
+</body>
+
+</html>

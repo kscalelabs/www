@@ -2,13 +2,14 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Annotated, AsyncGenerator
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2AuthorizationCodeBearer
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import APIKeyCookie, APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from www.app.db import create_tables
@@ -19,17 +20,19 @@ from www.app.errors import (
     NotAuthenticatedError,
     NotAuthorizedError,
 )
-from www.app.routers.artifacts import router as artifacts_router
-from www.app.routers.auth import router as auth_router
-from www.app.routers.keys import router as keys_router
-from www.app.routers.krecs import router as krecs_router
-from www.app.routers.listings import router as listings_router
-from www.app.routers.onshape import router as onshape_router
-from www.app.routers.robots import router as robots_router
-from www.app.routers.teleop import router as teleop_router
-from www.app.routers.users import router as users_router
+
+# from www.app.routers.artifacts import router as artifacts_router
+from www.app.routers.auth import User, get_user_from_request, router as auth_router
+from www.app.static import templates
+
+# from www.app.routers.keys import router as keys_router
+# from www.app.routers.krecs import router as krecs_router
+# from www.app.routers.listings import router as listings_router
+# from www.app.routers.onshape import router as onshape_router
+# from www.app.routers.robots import router as robots_router
+# from www.app.routers.teleop import router as teleop_router
+# from www.app.routers.users import router as users_router
 from www.settings import settings
-from www.utils import get_cors_origins
 
 
 @asynccontextmanager
@@ -51,15 +54,17 @@ api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 app = FastAPI(
     title="K-Scale",
     version="1.0.0",
-    docs_url="/",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    swagger_ui_init_oauth={
+        "appName": "www",
+        "clientId": settings.oauth.cognito_client_id,
+        "usePkceWithAuthorizationCodeGrant": True,
+    },
 )
 
 # Adds CORS middleware.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_cors_origins(),
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,13 +76,7 @@ app.add_middleware(
     secret_key=settings.middleware.secret_key,
 )
 
-oauth2_scheme = OAuth2AuthorizationCodeBearer(
-    authorizationUrl="https://accounts.google.com/o/oauth2/auth",
-    tokenUrl="https://accounts.google.com/o/oauth2/token",
-    refreshUrl="https://accounts.google.com/o/oauth2/token",
-    scopes={"openid": "Access your OpenAI information"},
-    auto_error=False,
-)
+app.mount("/static", app=StaticFiles(directory="www/static"), name="static")
 
 
 @app.exception_handler(ValueError)
@@ -134,15 +133,23 @@ async def validate_auth_token(auth_token: str = Depends(api_key_header)) -> str:
     return auth_token
 
 
+@app.get("/", name="index")
+async def index(
+    request: Request,
+    user: Annotated[User, Depends(get_user_from_request)],
+) -> HTMLResponse:
+    return templates.TemplateResponse("index.html", {"request": request, "is_authenticated": user is not None})
+
+
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(artifacts_router, prefix="/artifacts", tags=["artifacts"])
-app.include_router(keys_router, prefix="/keys", tags=["keys"])
-app.include_router(listings_router, prefix="/listings", tags=["listings"])
-app.include_router(onshape_router, prefix="/onshape", tags=["onshape"])
-app.include_router(robots_router, prefix="/robots", tags=["robots"])
-app.include_router(users_router, prefix="/users", tags=["users"])
-app.include_router(teleop_router, prefix="/teleop", tags=["teleop"])
-app.include_router(krecs_router, prefix="/krecs", tags=["krecs"])
+# app.include_router(artifacts_router, prefix="/artifacts", tags=["artifacts"])
+# app.include_router(keys_router, prefix="/keys", tags=["keys"])
+# app.include_router(listings_router, prefix="/listings", tags=["listings"])
+# app.include_router(onshape_router, prefix="/onshape", tags=["onshape"])
+# app.include_router(robots_router, prefix="/robots", tags=["robots"])
+# app.include_router(users_router, prefix="/users", tags=["users"])
+# app.include_router(teleop_router, prefix="/teleop", tags=["teleop"])
+# app.include_router(krecs_router, prefix="/krecs", tags=["krecs"])
 
 # For running with debugger
 if __name__ == "__main__":

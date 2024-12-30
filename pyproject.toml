@@ -35,7 +35,9 @@ namespace_packages = false
 [[tool.mypy.overrides]]
 
 module = [
+    "authlib.*",
     "boto3.*",
+    "jose.*",
     "moto.*",
     "mujoco.*",
     "pybullet_utils.*",

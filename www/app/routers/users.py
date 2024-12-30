@@ -14,11 +14,8 @@ from www.app.errors import ItemNotFoundError
 from www.app.model import User, UserPermission
 from www.app.security.requests import get_request_api_key_id
 from www.app.security.user import (
-    get_session_user_with_admin_permission,
     get_session_user_with_read_permission,
     get_session_user_with_write_permission,
-    verify_admin_permission,
-    verify_target_not_admin,
 )
 from www.app.utils.email import send_delete_email
 
@@ -256,60 +253,3 @@ async def validate_api_key_endpoint(
         return True
     except ItemNotFoundError:
         return False
-
-
-class SetModeratorRequest(BaseModel):
-    user_id: str
-    is_mod: bool
-
-
-@router.post("/set-moderator")
-async def set_moderator(
-    request: SetModeratorRequest,
-    admin_user: Annotated[User, Depends(get_session_user_with_admin_permission)],
-    crud: Annotated[Crud, Depends(Crud.get)],
-) -> UserPublic:
-    verify_admin_permission(admin_user, "modify moderator status")
-
-    target_user = await crud.get_user(request.user_id, throw_if_missing=True)
-    verify_target_not_admin(target_user, "modify moderator status")
-
-    updated_user = await crud.set_moderator(request.user_id, request.is_mod)
-    return UserPublic(**updated_user.model_dump())
-
-
-@router.get("/check-username/{username}")
-async def check_username_availability(
-    username: str,
-    crud: Annotated[Crud, Depends(Crud.get)],
-) -> dict[str, bool]:
-    logger.info("Checking if username %s is taken", username)
-    is_taken = await crud.is_username_taken(username)
-    return {"available": not is_taken}
-
-
-class SetContentManagerRequest(BaseModel):
-    user_id: str
-    is_content_manager: bool
-
-
-@router.post("/set-content-manager")
-async def set_content_manager(
-    request: SetContentManagerRequest,
-    admin_user: Annotated[User, Depends(get_session_user_with_admin_permission)],
-    crud: Annotated[Crud, Depends(Crud.get)],
-) -> UserPublic:
-    verify_admin_permission(admin_user, "modify content manager status")
-
-    target_user = await crud.get_user(request.user_id, throw_if_missing=True)
-    verify_target_not_admin(target_user, "modify content manager status")
-
-    try:
-        updated_user = await crud.set_content_manager(request.user_id, request.is_content_manager)
-        return UserPublic(**updated_user.model_dump())
-    except Exception as e:
-        logger.error("Error setting content manager status: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Unable to update content manager status. Please verify the user exists and try again.",
-        )

@@ -1,3 +1,5 @@
+oauth:
+  cognito_redirect_uri: http://api.kscale.dev/auth/login
 dynamo:
   table_name: www
 site:

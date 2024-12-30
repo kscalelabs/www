@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from omegaconf import II, MISSING
+from omegaconf import II, MISSING, SI
 
 
 @dataclass
@@ -12,10 +12,17 @@ class MiddlewareSettings:
 
 @dataclass
 class OauthSettings:
-    cognito_authority = field(default=II("oc.env:COGNITO_AUTHORITY"))
-    cognito_client_id = field(default=II("oc.env:COGNITO_CLIENT_ID"))
-    cognito_client_secret = field(default=II("oc.env:COGNITO_CLIENT_SECRET"))
-    cognito_metadata_url = field(default=II("oc.env:COGNITO_METADATA_URL"))
+    cognito_authority: str = field(default=II("oc.env:COGNITO_AUTHORITY"))
+    cognito_client_id: str = field(default=II("oc.env:COGNITO_CLIENT_ID"))
+    cognito_client_secret: str = field(default=II("oc.env:COGNITO_CLIENT_SECRET"))
+    cognito_redirect_uri: str = field(default=MISSING)
+    cognito_uri: str = field(default="https://auth.kscale.dev")
+    authorization_url: str = field(default=SI("${oauth.cognito_uri}/oauth2/authorize"))
+    client_id: str = field(default="www-api")
+    token_url: str = field(default=SI("${oauth.cognito_uri}/oauth2/token"))
+    jwks_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/jwks.json"))
+    server_metadata_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/openid-configuration"))
+    permitted_jwt_audiences: list[str] = field(default_factory=lambda: ["account"])
 
 
 @dataclass

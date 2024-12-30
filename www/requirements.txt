@@ -6,6 +6,8 @@ pydantic
 
 # Authentication
 authlib
+pycognito
+python-jose
 
 # AWS dependencies.
 aioboto3

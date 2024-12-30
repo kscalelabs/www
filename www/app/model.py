@@ -12,7 +12,6 @@ from typing import Literal, Self, cast, get_args
 from pydantic import BaseModel, field_validator
 
 from www.app.errors import InternalError
-from www.app.utils.password import hash_password
 from www.settings import settings
 from www.utils import new_uuid
 
@@ -66,12 +65,12 @@ class User(StoreBaseModel):
         bio: str | None = None,
     ) -> Self:
         now = int(time.time())
-        hashed_pw = hash_password(password) if password else None
+
         return cls(
             id=new_uuid(),
             email=email,
             username=username,
-            hashed_password=hashed_pw,
+            hashed_password=password,
             created_at=now,
             updated_at=now,
             github_id=github_id,
