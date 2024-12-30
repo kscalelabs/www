@@ -40,8 +40,6 @@ class User(StoreBaseModel):
 
     email: str
     username: str
-    hashed_password: str | None = None
-    permissions: set[UserPermission] | None = None
     created_at: int
     updated_at: int
     github_id: str | None = None
@@ -56,7 +54,6 @@ class User(StoreBaseModel):
         cls,
         email: str,
         username: str,
-        password: str | None = None,
         github_id: str | None = None,
         google_id: str | None = None,
         first_name: str | None = None,
@@ -70,7 +67,6 @@ class User(StoreBaseModel):
             id=new_uuid(),
             email=email,
             username=username,
-            hashed_password=password,
             created_at=now,
             updated_at=now,
             github_id=github_id,

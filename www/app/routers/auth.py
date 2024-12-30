@@ -8,11 +8,10 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fastapi.requests import Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from pydantic.main import BaseModel
 from starlette.config import Config as StarletteConfig
 
-from www.app.static import templates
 from www.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -63,11 +62,11 @@ async def logout(request: Request) -> RedirectResponse:
 
 
 @router.get("/authorize")
-async def authorize(request: Request) -> HTMLResponse:
+async def authorize(request: Request) -> RedirectResponse:
     token = await cognito.authorize_access_token(request)
     user = token["userinfo"]
     request.session["user"] = user
-    return templates.TemplateResponse("auth.html", {"request": request})
+    return RedirectResponse(url=request.url_for("index"))
 
 
 class User(BaseModel):
