@@ -74,7 +74,6 @@ class User(BaseModel):
     groups: list[str]
     email: str
     email_verified: bool
-    username: str
 
 
 async def get_user_from_request(request: Request) -> User | None:
@@ -86,7 +85,6 @@ async def get_user_from_request(request: Request) -> User | None:
         groups=user["cognito:groups"],
         email=user["email"],
         email_verified=user["email_verified"],
-        username=user["cognito:username"],
     )
 
 
@@ -115,7 +113,6 @@ def require_groups(required_groups: list[str]) -> Callable[[User], User]:
 class ProfileResponse(BaseModel):
     email: str
     email_verified: bool
-    username: str
     groups: list[str]
 
 
@@ -124,6 +121,5 @@ async def profile(user: Annotated[User, Depends(require_user)]) -> ProfileRespon
     return ProfileResponse(
         email=user.email,
         email_verified=user.email_verified,
-        username=user.username,
         groups=user.groups,
     )
