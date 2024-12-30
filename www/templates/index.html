@@ -13,7 +13,15 @@
       {% if is_authenticated %}
       <a href="/auth/logout">Logout</a>
       {% else %}
-      <a href="/auth/login">Login</a>
+      <a href="/auth/login" onclick="openAndMonitorWindow(event)">Login</a>
+
+      <script>
+        function openAndMonitorWindow(event) {
+          event.preventDefault();
+          const newWindow = window.open('/auth/login', 'newWindow', 'width=800,height=600');
+        }
+      </script>
+
       {% endif %}
     </li>
     <li>
