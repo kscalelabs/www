@@ -19,21 +19,12 @@ from www.app.model import (
     APIKeySource,
     OAuthKey,
     User,
-    UserPermission,
 )
 from www.app.utils.email import send_signup_notification_email
 from www.settings import settings
 from www.utils import cache_async_result
 
 logger = logging.getLogger(__name__)
-
-
-def github_auth_key(github_id: str) -> str:
-    return f"github:{github_id}"
-
-
-def google_auth_key(google_id: str) -> str:
-    return f"google:{google_id}"
 
 
 class UserNotFoundError(Exception):
@@ -51,7 +42,6 @@ class UserPublic(BaseModel):
     id: str
     email: str
     username: str
-    permissions: set[UserPermission] | None = None
     created_at: int
     updated_at: int | None = None
     first_name: str | None = None

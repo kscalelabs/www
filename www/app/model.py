@@ -533,35 +533,6 @@ class Robot(StoreBaseModel):
         )
 
 
-class TeleopICECandidate(StoreBaseModel):
-    """Tracks ICE candidates for teleoperation."""
-
-    user_id: str
-    robot_id: str
-    candidate: str
-    created_at: int
-    ttl: int | None = None
-
-    @classmethod
-    def create(
-        cls,
-        user_id: str,
-        robot_id: str,
-        candidate: str,
-        expire_after_n_hours: int = 24,
-    ) -> Self:
-        now = int(time.time())
-        ttl_timestamp = int((datetime.utcnow() + timedelta(hours=expire_after_n_hours)).timestamp())
-        return cls(
-            id=new_uuid(),
-            user_id=user_id,
-            robot_id=robot_id,
-            candidate=candidate,
-            created_at=now,
-            ttl=ttl_timestamp,
-        )
-
-
 class KRec(StoreBaseModel):
     """Krec recorded from robot runtime."""
 
