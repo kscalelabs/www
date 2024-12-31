@@ -4,7 +4,7 @@ s3:
   bucket: artifacts
   prefix: media/
 dynamo:
-  table_name: kscale-store-local
+  table_suffix: local
 cloudfront:
   domain: ${site.artifact_base_url}
   key_id: null

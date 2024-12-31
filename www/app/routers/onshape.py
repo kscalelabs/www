@@ -11,7 +11,7 @@ from pydantic.main import BaseModel
 
 from www.app.db import Crud
 from www.app.model import User, can_write_listing
-from www.app.security.user import get_session_user_with_write_permission
+from www.app.auth import require_user
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ class SetRequest(BaseModel):
 async def set_onshape_document(
     listing_id: str,
     request: SetRequest,
-    user: Annotated[User, Depends(get_session_user_with_write_permission)],
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[Crud, Depends(Crud.get)],
 ) -> None:
     listing = await crud.get_listing(listing_id)

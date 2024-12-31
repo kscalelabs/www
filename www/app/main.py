@@ -21,11 +21,11 @@ from www.app.errors import (
 
 # from www.app.routers.artifacts import router as artifacts_router
 from www.app.routers.auth import router as auth_router
+from www.app.routers.onshape import router as onshape_router
 
 # from www.app.routers.keys import router as keys_router
 # from www.app.routers.krecs import router as krecs_router
 # from www.app.routers.listings import router as listings_router
-# from www.app.routers.onshape import router as onshape_router
 # from www.app.routers.robots import router as robots_router
 # from www.app.routers.teleop import router as teleop_router
 from www.settings import settings
@@ -121,10 +121,10 @@ async def bad_artifact_exception_handler(request: Request, exc: BadArtifactError
 
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(onshape_router, prefix="/onshape", tags=["onshape"])
 # app.include_router(artifacts_router, prefix="/artifacts", tags=["artifacts"])
 # app.include_router(keys_router, prefix="/keys", tags=["keys"])
 # app.include_router(listings_router, prefix="/listings", tags=["listings"])
-# app.include_router(onshape_router, prefix="/onshape", tags=["onshape"])
 # app.include_router(robots_router, prefix="/robots", tags=["robots"])
 # app.include_router(teleop_router, prefix="/teleop", tags=["teleop"])
 # app.include_router(krecs_router, prefix="/krecs", tags=["krecs"])

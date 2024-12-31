@@ -3,6 +3,7 @@
 import asyncio
 import itertools
 import logging
+from abc import ABC, abstractmethod
 from typing import (
     IO,
     Any,
@@ -13,6 +14,7 @@ from typing import (
     TypeVar,
     overload,
 )
+import functools
 
 import aioboto3
 from aiobotocore.response import StreamingBody
@@ -24,8 +26,7 @@ from types_aiobotocore_s3.service_resource import S3ServiceResource
 from www.app.errors import InternalError, ItemNotFoundError
 from www.app.model import StoreBaseModel
 from www.settings import settings
-
-TABLE_NAME = settings.dynamo.table_name
+from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +40,16 @@ TableKey = tuple[str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 GlobalSecondaryIndex = tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 
 
-class BaseCrud(AsyncContextManager["BaseCrud"]):
+class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
     def __init__(self) -> None:
         super().__init__()
 
         self.__db: DynamoDBServiceResource | None = None
         self.__s3: S3ServiceResource | None = None
+
+    @abstractmethod
+    def _get_table_name(self) -> str:
+        """Returns the name of the table."""
 
     @property
     def db(self) -> DynamoDBServiceResource:
@@ -52,15 +57,13 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             raise RuntimeError("Must call __aenter__ first!")
         return self.__db
 
-    @property
-    def s3(self) -> S3ServiceResource:
-        if self.__s3 is None:
-            raise RuntimeError("Must call __aenter__ first!")
-        return self.__s3
+    @functools.cached_property
+    def table_name(self) -> str:
+        return f"{self._get_table_name()}-{settings.dynamo.table_suffix}"
 
     @property
     async def table(self) -> Table:
-        return await self.db.Table(TABLE_NAME)
+        return await self.db.Table(self.table_name)
 
     @classmethod
     def get_gsis(cls) -> set[str]:
@@ -71,21 +74,25 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         return f"{colname}_index"
 
     async def __aenter__(self) -> Self:
+        ctx = await super().__aenter__()
         session = aioboto3.Session()
         db = session.resource("dynamodb")
-        s3 = session.resource("s3")
-        db, s3 = await asyncio.gather(db.__aenter__(), s3.__aenter__())
-        self.__db = db
-        self.__s3 = s3
-        return self
+        _, db = await asyncio.gather(super().__aenter__(), db.__aenter__())
+        ctx.__db = db
+        return ctx
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # noqa: ANN401
         to_close = []
         if self.__db is not None:
             to_close.append(self.__db)
-        if self.__s3 is not None:
-            to_close.append(self.__s3)
-        await asyncio.gather(*(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close))
+        await asyncio.gather(
+            super().__aexit__(exc_type, exc_val, exc_tb),
+            *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
+        )
+
+    async def __call__(self) -> AsyncGenerator[Self, None]:
+        async with self as crud:
+            yield crud
 
     async def _add_item(self, item: StoreBaseModel, unique_fields: list[str] | None = None) -> None:
         table = await self.table
@@ -263,11 +270,11 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         for i in range(0, len(item_ids), chunk_size):
             chunk = item_ids[i : i + chunk_size]
             keys = [{"id": item_id} for item_id in chunk]
-            response = await self.db.batch_get_item(RequestItems={TABLE_NAME: {"Keys": keys}})
+            response = await self.db.batch_get_item(RequestItems={self.table_name: {"Keys": keys}})
 
             # Maps the items to their IDs to return them in the correct order.
             item_ids_to_items: dict[str, T] = {}
-            for item in response["Responses"][TABLE_NAME]:
+            for item in response["Responses"][self.table_name]:
                 item_impl = self._validate_item(item, item_class)
                 item_ids_to_items[item_impl.id] = item_impl
 
@@ -379,7 +386,6 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
         return items[0]
 
     async def _update_item(self, id: str, model_type: type[T], updates: dict[str, Any]) -> None:
-        table_name = TABLE_NAME
         key = {"id": id}
 
         # Add condition to ensure we're updating the correct type
@@ -391,7 +397,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
 
         try:
             await self.db.meta.client.update_item(
-                TableName=table_name,
+                TableName=self.table_name,
                 Key=key,
                 UpdateExpression=update_expression,
                 ConditionExpression=condition_expression,
@@ -405,6 +411,168 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             elif e.response["Error"]["Code"] == "ConditionalCheckFailedException":
                 raise ItemNotFoundError(f"Item not found or is not of type {model_type.__name__}")
             raise
+
+    async def _create_dynamodb_table(
+        self,
+        keys: list[TableKey],
+        gsis: list[GlobalSecondaryIndex] | None = None,
+        deletion_protection: bool = False,
+    ) -> None:
+        """Creates a table in the Dynamo database if a table of that name does not already exist.
+
+        Args:
+            name: Name of the table.
+            keys: Primary and secondary keys. Do not include non-key attributes.
+            gsis: Making an attribute a GSI is required in order to query
+                against it. Note HASH on a GSI does not actually enforce
+                uniqueness. Instead, the difference is: you cannot query
+                RANGE fields alone, but you may query HASH fields.
+            deletion_protection: Whether the table is protected from being
+                deleted.
+        """
+        try:
+            await self.db.meta.client.describe_table(TableName=self.table_name)
+            logger.info("Found existing table %s", self.table_name)
+        except ClientError:
+            logger.info("Creating %s table", self.table_name)
+
+            if gsis:
+                table = await self.db.create_table(
+                    AttributeDefinitions=[
+                        {"AttributeName": n, "AttributeType": t}
+                        for n, t in itertools.chain(((n, t) for (n, t, _) in keys), ((n, t) for _, n, t, _ in gsis))
+                    ],
+                    TableName=self.table_name,
+                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                    GlobalSecondaryIndexes=(
+                        [
+                            {
+                                "IndexName": i,
+                                "KeySchema": [{"AttributeName": n, "KeyType": t}],
+                                "Projection": {"ProjectionType": "ALL"},
+                            }
+                            for i, n, _, t in gsis
+                        ]
+                    ),
+                    DeletionProtectionEnabled=deletion_protection,
+                    BillingMode="PAY_PER_REQUEST",
+                )
+
+            else:
+                table = await self.db.create_table(
+                    AttributeDefinitions=[
+                        {"AttributeName": n, "AttributeType": t} for n, t in ((n, t) for (n, t, _) in keys)
+                    ],
+                    TableName=self.table_name,
+                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                    DeletionProtectionEnabled=deletion_protection,
+                    BillingMode="PAY_PER_REQUEST",
+                )
+
+            await table.wait_until_exists()
+
+    async def _delete_dynamodb_table(self) -> None:
+        """Deletes a table in the Dynamo database.
+
+        Args:
+            name: Name of the table.
+        """
+        try:
+            table = await self.db.Table(self.table_name)
+            await table.delete()
+            logger.info("Deleted table %s", self.table_name)
+        except ClientError:
+            logger.info("Table %s does not exist", self.table_name)
+
+    async def _get_by_known_id(self, record_id: str) -> dict[str, Any] | None:
+        table = await self.table
+        response = await table.get_item(Key={"id": record_id})
+        return response.get("Item")
+
+    async def get_file_size(self, filename: str) -> int | None:
+        """Gets the size of a file in S3.
+
+        Args:
+            filename: The name of the file
+
+        Returns:
+            The size in bytes, or None if the file doesn't exist
+        """
+        try:
+            s3_object = await self.s3.meta.client.head_object(
+                Bucket=settings.s3.bucket, Key=f"{settings.s3.prefix}{filename}"
+            )
+            return s3_object.get("ContentLength")
+        except ClientError as e:
+            logger.error("Failed to get S3 object size: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error getting file size: %s", e)
+            return None
+
+    async def generate_presigned_download_url(
+        self,
+        filename: str,
+        s3_key: str,
+        content_type: str,
+        checksum_algorithm: str = "SHA256",
+        expiration: int = 3600,
+    ) -> tuple[str, str | None]:
+        """Generate a presigned URL for downloading a file from S3 with checksum."""
+        try:
+            full_key = f"{settings.s3.prefix}{s3_key}"
+            head_response = await self.s3.meta.client.head_object(
+                Bucket=settings.s3.bucket, Key=full_key, ChecksumMode="ENABLED"
+            )
+            # Cast the response to str | None
+            checksum_value = head_response.get(f"Checksum{checksum_algorithm}")
+            checksum: str | None = str(checksum_value) if checksum_value is not None else None
+
+            url = await self.s3.meta.client.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": settings.s3.bucket,
+                    "Key": full_key,
+                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
+                    "ResponseContentType": content_type,
+                    "ChecksumMode": "ENABLED",
+                },
+                ExpiresIn=expiration,
+            )
+            return str(url), checksum
+        except Exception as e:
+            logger.error(
+                "Error generating presigned download URL - Bucket: %s, Key: %s: %s",
+                settings.s3.bucket,
+                full_key,
+                str(e),
+            )
+            raise
+
+
+class BaseS3Crud(AsyncContextManager["BaseS3Crud"]):
+
+    @property
+    def s3(self) -> S3ServiceResource:
+        if self.__s3 is None:
+            raise RuntimeError("Must call __aenter__ first!")
+        return self.__s3
+
+    async def __aenter__(self) -> Self:
+        session = aioboto3.Session()
+        s3 = session.resource("s3")
+        _, s3 = await asyncio.gather(super().__aenter__(), s3.__aenter__())
+        self.__s3 = s3
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # noqa: ANN401
+        to_close = []
+        if self.__s3 is not None:
+            to_close.append(self.__s3)
+        await asyncio.gather(
+            super().__aexit__(exc_type, exc_val, exc_tb),
+            *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
+        )
 
     async def _upload_to_s3(self, data: IO[bytes], name: str, filename: str, content_type: str) -> None:
         """Uploads some data to S3."""
@@ -471,92 +639,6 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
                 },
             )
 
-    async def _delete_s3_bucket(self) -> None:
-        """Deletes an S3 bucket."""
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        logger.info("Deleting bucket %s", settings.s3.bucket)
-        async for obj in bucket.objects.all():
-            await obj.delete()
-        await bucket.delete()
-
-    async def _create_dynamodb_table(
-        self,
-        name: str,
-        keys: list[TableKey],
-        gsis: list[GlobalSecondaryIndex] | None = None,
-        deletion_protection: bool = False,
-    ) -> None:
-        """Creates a table in the Dynamo database if a table of that name does not already exist.
-
-        Args:
-            name: Name of the table.
-            keys: Primary and secondary keys. Do not include non-key attributes.
-            gsis: Making an attribute a GSI is required in order to query
-                against it. Note HASH on a GSI does not actually enforce
-                uniqueness. Instead, the difference is: you cannot query
-                RANGE fields alone, but you may query HASH fields.
-            deletion_protection: Whether the table is protected from being
-                deleted.
-        """
-        try:
-            await self.db.meta.client.describe_table(TableName=name)
-            logger.info("Found existing table %s", name)
-        except ClientError:
-            logger.info("Creating %s table", name)
-
-            if gsis:
-                table = await self.db.create_table(
-                    AttributeDefinitions=[
-                        {"AttributeName": n, "AttributeType": t}
-                        for n, t in itertools.chain(((n, t) for (n, t, _) in keys), ((n, t) for _, n, t, _ in gsis))
-                    ],
-                    TableName=name,
-                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
-                    GlobalSecondaryIndexes=(
-                        [
-                            {
-                                "IndexName": i,
-                                "KeySchema": [{"AttributeName": n, "KeyType": t}],
-                                "Projection": {"ProjectionType": "ALL"},
-                            }
-                            for i, n, _, t in gsis
-                        ]
-                    ),
-                    DeletionProtectionEnabled=deletion_protection,
-                    BillingMode="PAY_PER_REQUEST",
-                )
-
-            else:
-                table = await self.db.create_table(
-                    AttributeDefinitions=[
-                        {"AttributeName": n, "AttributeType": t} for n, t in ((n, t) for (n, t, _) in keys)
-                    ],
-                    TableName=name,
-                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
-                    DeletionProtectionEnabled=deletion_protection,
-                    BillingMode="PAY_PER_REQUEST",
-                )
-
-            await table.wait_until_exists()
-
-    async def _delete_dynamodb_table(self, name: str) -> None:
-        """Deletes a table in the Dynamo database.
-
-        Args:
-            name: Name of the table.
-        """
-        try:
-            table = await self.db.Table(name)
-            await table.delete()
-            logger.info("Deleted table %s", name)
-        except ClientError:
-            logger.info("Table %s does not exist", name)
-
-    async def _get_by_known_id(self, record_id: str) -> dict[str, Any] | None:
-        table = await self.table
-        response = await table.get_item(Key={"id": record_id})
-        return response.get("Item")
-
     async def generate_presigned_upload_url(
         self,
         filename: str,
@@ -593,62 +675,14 @@ class BaseCrud(AsyncContextManager["BaseCrud"]):
             logger.error("Failed to generate presigned URL: %s", e)
             raise
 
-    async def get_file_size(self, filename: str) -> int | None:
-        """Gets the size of a file in S3.
+    async def _delete_s3_bucket(self) -> None:
+        """Deletes an S3 bucket."""
+        bucket = await self.s3.Bucket(settings.s3.bucket)
+        logger.info("Deleting bucket %s", settings.s3.bucket)
+        async for obj in bucket.objects.all():
+            await obj.delete()
+        await bucket.delete()
 
-        Args:
-            filename: The name of the file
-
-        Returns:
-            The size in bytes, or None if the file doesn't exist
-        """
-        try:
-            s3_object = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=f"{settings.s3.prefix}{filename}"
-            )
-            return s3_object.get("ContentLength")
-        except ClientError as e:
-            logger.error("Failed to get S3 object size: %s", e)
-            return None
-        except Exception as e:
-            logger.error("Unexpected error getting file size: %s", e)
-            return None
-
-    async def generate_presigned_download_url(
-        self,
-        filename: str,
-        s3_key: str,
-        content_type: str,
-        checksum_algorithm: str = "SHA256",
-        expiration: int = 3600,
-    ) -> tuple[str, str | None]:
-        """Generate a presigned URL for downloading a file from S3 with checksum."""
-        try:
-            full_key = f"{settings.s3.prefix}{s3_key}"
-            head_response = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=full_key, ChecksumMode="ENABLED"
-            )
-            # Cast the response to str | None
-            checksum_value = head_response.get(f"Checksum{checksum_algorithm}")
-            checksum: str | None = str(checksum_value) if checksum_value is not None else None
-
-            url = await self.s3.meta.client.generate_presigned_url(
-                "get_object",
-                Params={
-                    "Bucket": settings.s3.bucket,
-                    "Key": full_key,
-                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
-                    "ResponseContentType": content_type,
-                    "ChecksumMode": "ENABLED",
-                },
-                ExpiresIn=expiration,
-            )
-            return str(url), checksum
-        except Exception as e:
-            logger.error(
-                "Error generating presigned download URL - Bucket: %s, Key: %s: %s",
-                settings.s3.bucket,
-                full_key,
-                str(e),
-            )
-            raise
+    async def __call__(self) -> AsyncGenerator[Self, None]:
+        async with self as crud:
+            yield crud

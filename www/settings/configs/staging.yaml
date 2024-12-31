@@ -1,7 +1,7 @@
 oauth:
   cognito_redirect_uri: http://api.staging.kscale.dev/auth/login
 dynamo:
-  table_name: kscale-www-staging-cluster
+  table_suffix: staging
 site:
   homepage: https://dashboard-staging.kscale.dev
   artifact_base_url: https://stagingassets.kscale.dev/

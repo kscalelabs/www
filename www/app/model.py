@@ -6,11 +6,11 @@ expects (for example, converting a UUID into a string).
 """
 
 import time
-from datetime import datetime, timedelta
 from typing import Literal, Self, cast, get_args
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
+from www.app.auth import User
 from www.app.errors import InternalError
 from www.settings import settings
 from www.utils import new_uuid
@@ -25,122 +25,6 @@ class StoreBaseModel(BaseModel):
     """
 
     id: str
-
-
-UserPermission = Literal["is_admin", "is_mod", "is_content_manager", "is_verified_member"]
-
-
-class User(StoreBaseModel):
-    """Defines the user model for the API.
-
-    Users are defined by their id, email, and username (all unique).
-    Hashed password is set if user signs up with email and password, and is
-    left empty if the user signed up with Google or Github OAuth.
-    """
-
-    email: str
-    username: str
-    created_at: int
-    updated_at: int
-    github_id: str | None = None
-    google_id: str | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-    name: str | None = None
-    bio: str | None = None
-
-    @classmethod
-    def create(
-        cls,
-        email: str,
-        username: str,
-        github_id: str | None = None,
-        google_id: str | None = None,
-        first_name: str | None = None,
-        last_name: str | None = None,
-        name: str | None = None,
-        bio: str | None = None,
-    ) -> Self:
-        now = int(time.time())
-
-        return cls(
-            id=new_uuid(),
-            email=email,
-            username=username,
-            created_at=now,
-            updated_at=now,
-            github_id=github_id,
-            google_id=google_id,
-            first_name=first_name,
-            last_name=last_name,
-            name=name,
-            bio=bio,
-        )
-
-    def update_timestamp(self) -> None:
-        self.updated_at = int(time.time())
-
-    def verify_email(self) -> None:
-        self.email_verified_at = int(time.time())
-
-    def set_username(self, new_username: str) -> None:
-        self.username = new_username
-        self.update_timestamp()
-
-
-class OAuthKey(StoreBaseModel):
-    """Keys for OAuth providers which identify users."""
-
-    user_id: str
-    provider: str
-    user_token: str
-
-    @classmethod
-    def create(cls, user_id: str, provider: str, user_token: str) -> Self:
-        return cls(id=new_uuid(), user_id=user_id, provider=provider, user_token=user_token)
-
-
-APIKeySource = Literal["user", "oauth", "password"]
-APIKeyPermission = Literal["read", "write", "admin"]
-APIKeyPermissionSet = set[APIKeyPermission] | Literal["full", None]
-
-
-class APIKey(StoreBaseModel):
-    """The API key is used for querying the API.
-
-    Downstream users keep the API key, and it is used to authenticate
-    requests to the API. The key is stored in the database, and can be
-    revoked by the user at any time.
-    """
-
-    user_id: str
-    source: APIKeySource
-    permissions: set[APIKeyPermission] | None = None
-    ttl: int | None = None
-    created_at: int
-
-    @field_validator("permissions", mode="before")
-    @classmethod
-    def convert_permissions_to_set(
-        cls, v: list[APIKeyPermission] | set[APIKeyPermission] | None
-    ) -> set[APIKeyPermission] | None:
-        if isinstance(v, list):
-            return set(v)
-        return v
-
-    @classmethod
-    def create(cls, user_id: str, source: APIKeySource, permissions: APIKeyPermissionSet) -> Self:
-        if permissions == "full":
-            permissions = {"read", "write", "admin"}
-        ttl_timestamp = int((datetime.utcnow() + timedelta(days=90)).timestamp())
-        return cls(
-            id=new_uuid(),
-            user_id=user_id,
-            source=source,
-            permissions=permissions,
-            ttl=ttl_timestamp,
-            created_at=int(time.time()),
-        )
 
 
 ArtifactSize = Literal["small", "large"]
@@ -451,7 +335,7 @@ def get_artifact_urls(
 
 
 async def can_write_artifact(user: User, artifact: Artifact) -> bool:
-    if user.permissions is not None and "is_admin" in user.permissions:
+    if user.is_admin:
         return True
     if user.id == artifact.user_id:
         return True
@@ -459,7 +343,7 @@ async def can_write_artifact(user: User, artifact: Artifact) -> bool:
 
 
 async def can_write_listing(user: User, listing: Listing) -> bool:
-    if user.permissions is not None and ("is_admin" in user.permissions or "is_mod" in user.permissions):
+    if user.is_admin or user.is_moderator:
         return True
     if user.id == listing.user_id:
         return True

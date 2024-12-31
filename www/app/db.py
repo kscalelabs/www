@@ -14,23 +14,6 @@ from www.app.crud.robots import RobotsCrud
 from www.app.crud.users import UserCrud
 
 
-class Crud(
-    OnshapeCrud,
-    UserCrud,
-    ListingsCrud,
-    ArtifactsCrud,
-    KRecsCrud,
-    RobotsCrud,
-    BaseCrud,
-):
-    """Composes the various CRUD classes into a single class."""
-
-    @classmethod
-    async def get(cls) -> AsyncGenerator[Self, None]:
-        async with cls() as crud:
-            yield crud
-
-
 async def create_tables(crud: Crud | None = None, deletion_protection: bool = False) -> None:
     """Initializes all of the database tables.
 

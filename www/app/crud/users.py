@@ -13,13 +13,6 @@ from pydantic import BaseModel
 
 from www.app.crud.base import TABLE_NAME, BaseCrud
 from www.app.crud.listings import ListingsCrud
-from www.app.model import (
-    APIKey,
-    APIKeyPermissionSet,
-    APIKeySource,
-    OAuthKey,
-    User,
-)
 from www.app.utils.email import send_signup_notification_email
 from www.settings import settings
 from www.utils import cache_async_result

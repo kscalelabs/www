@@ -66,7 +66,7 @@ class S3Settings:
 
 @dataclass
 class DynamoSettings:
-    table_name: str = field(default=MISSING)
+    table_suffix: str = field(default=MISSING)
 
 
 @dataclass
