@@ -3,7 +3,7 @@
 import time
 from typing import NotRequired, TypedDict, Unpack
 
-from www.app.crud.base import BaseCrud, ItemNotFoundError
+from www.app.crud.base import BaseDbCrud, ItemNotFoundError
 from www.app.model import Listing, Robot
 
 
@@ -15,8 +15,11 @@ class RobotData(TypedDict):
     updated_at: NotRequired[int]
 
 
-class RobotsCrud(BaseCrud):
+class RobotsCrud(BaseDbCrud):
     """CRUD operations for Robots."""
+
+    def _get_table_name(self) -> str:
+        return "robots"
 
     @classmethod
     def get_gsis(cls) -> set[str]:
@@ -66,3 +69,6 @@ class RobotsCrud(BaseCrud):
 
     async def delete_robot(self, robot: Robot) -> None:
         await self._delete_item(robot)
+
+
+robots_crud = RobotsCrud()

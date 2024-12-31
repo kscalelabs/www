@@ -15,7 +15,7 @@ from boto3.dynamodb.conditions import ComparisonCondition
 from fastapi import UploadFile
 from PIL import Image
 
-from www.app.crud.base import BaseCrud, ItemNotFoundError
+from www.app.crud.base import BaseDbCrud, ItemNotFoundError
 from www.app.errors import BadArtifactError
 from www.app.model import (
     DOWNLOAD_CONTENT_TYPE,
@@ -32,31 +32,67 @@ from www.utils import save_xml
 logger = logging.getLogger(__name__)
 
 
-async def iter_archive(file: UploadFile, artifact_type: Literal["tgz", "zip"]) -> AsyncIterator[tuple[bytes, str]]:
-    file_input = io.BytesIO(await file.read())
-    match artifact_type:
-        case "tgz":
-            tar_archive = tarfile.open(fileobj=file_input, mode="r:gz")
-            for tar_member in tar_archive.getmembers():
-                if tar_member.isfile():
-                    if (member_read := tar_archive.extractfile(tar_member)) is None:
-                        continue
-                    file_data = member_read.read()
-                    yield file_data, tar_member.name
-        case "zip":
-            zip_archive = zipfile.ZipFile(file_input)
-            for zip_member in zip_archive.namelist():
-                if not zip_member.endswith("/"):
-                    file_data = zip_archive.read(zip_member)
-                    yield file_data, zip_member
-        case _:
-            raise BadArtifactError(f"Invalid archive type: {artifact_type}")
+class ArtifactsCrud(BaseDbCrud):
+    """CRUD operations for Artifacts."""
 
+    def _get_table_name(self) -> str:
+        return "artifacts"
 
-class ArtifactsCrud(BaseCrud):
     @classmethod
     def get_gsis(cls) -> set[str]:
         return super().get_gsis().union({"user_id", "listing_id", "name"})
+
+    async def create_artifact(self, **artifact_data: Any) -> Artifact:
+        # Verify listing exists
+        listing = await self._get_item(artifact_data["listing_id"], Listing)
+        if not listing:
+            raise ItemNotFoundError(f"Listing with ID {artifact_data['listing_id']} not found")
+
+        artifact = Artifact.create(**artifact_data)
+        await self._add_item(artifact)
+        return artifact
+
+    async def get_artifact(self, artifact_id: str) -> Artifact:
+        artifact = await self._get_item(artifact_id, Artifact)
+        if not artifact:
+            raise ItemNotFoundError("Artifact not found")
+        return artifact
+
+    async def update_artifact(self, artifact_id: str, update_data: dict[str, Any]) -> Artifact:
+        artifact = await self.get_artifact(artifact_id)
+        if not artifact:
+            raise ItemNotFoundError("Artifact not found")
+
+        await self._update_item(artifact_id, Artifact, update_data)
+        updated_artifact = await self.get_artifact(artifact_id)
+        return updated_artifact
+
+    async def delete_artifact(self, artifact: Artifact) -> None:
+        await self._delete_item(artifact)
+
+    async def iter_archive(
+        self,
+        file: UploadFile,
+        artifact_type: Literal["tgz", "zip"],
+    ) -> AsyncIterator[tuple[bytes, str]]:
+        file_input = io.BytesIO(await file.read())
+        match artifact_type:
+            case "tgz":
+                tar_archive = tarfile.open(fileobj=file_input, mode="r:gz")
+                for tar_member in tar_archive.getmembers():
+                    if tar_member.isfile():
+                        if (member_read := tar_archive.extractfile(tar_member)) is None:
+                            continue
+                        file_data = member_read.read()
+                        yield file_data, tar_member.name
+            case "zip":
+                zip_archive = zipfile.ZipFile(file_input)
+                for zip_member in zip_archive.namelist():
+                    if not zip_member.endswith("/"):
+                        file_data = zip_archive.read(zip_member)
+                        yield file_data, zip_member
+            case _:
+                raise BadArtifactError(f"Invalid archive type: {artifact_type}")
 
     async def _crop_image(self, image: Image.Image, size: tuple[int, int]) -> IO[bytes]:
         # Simply squashes the image to the desired size.
@@ -185,7 +221,7 @@ class ArtifactsCrud(BaseCrud):
         with tempfile.TemporaryDirectory() as temp_dir:
             out_file = Path(temp_dir) / name
             with tarfile.open(out_file, mode="w:gz") as archive:
-                async for data, subname in iter_archive(file, artifact_type):
+                async for data, subname in self.iter_archive(file, artifact_type):
                     subtype = Path(subname).suffix.lower()
                     temp_path = Path(temp_dir) / subname
                     temp_path.parent.mkdir(parents=True, exist_ok=True)
@@ -339,3 +375,6 @@ class ArtifactsCrud(BaseCrud):
                 await self._update_item(artifact.id, Artifact, {"is_main": False})
 
         await self._update_item(artifact_id, Artifact, {"is_main": True})
+
+
+artifacts_crud = ArtifactsCrud()

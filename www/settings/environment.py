@@ -14,15 +14,8 @@ class MiddlewareSettings:
 class OauthSettings:
     cognito_authority: str = field(default=II("oc.env:COGNITO_AUTHORITY"))
     cognito_client_id: str = field(default=II("oc.env:COGNITO_CLIENT_ID"))
-    cognito_client_secret: str = field(default=II("oc.env:COGNITO_CLIENT_SECRET"))
-    cognito_redirect_uri: str = field(default=MISSING)
-    cognito_uri: str = field(default="https://auth.kscale.dev")
-    authorization_url: str = field(default=SI("${oauth.cognito_uri}/oauth2/authorize"))
-    client_id: str = field(default="www-api")
-    token_url: str = field(default=SI("${oauth.cognito_uri}/oauth2/token"))
     jwks_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/jwks.json"))
     server_metadata_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/openid-configuration"))
-    permitted_jwt_audiences: list[str] = field(default_factory=lambda: ["account"])
 
 
 @dataclass
@@ -67,6 +60,7 @@ class S3Settings:
 @dataclass
 class DynamoSettings:
     table_suffix: str = field(default=MISSING)
+    deletion_protection: bool = field(default=False)
 
 
 @dataclass

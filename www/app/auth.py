@@ -3,13 +3,12 @@
 import logging
 from typing import Annotated, Callable, Literal
 
-from fastapi import Depends, status, Request
+from fastapi import Depends, Request, status
 from fastapi.exceptions import HTTPException
-from pydantic.main import BaseModel
 from fastapi.security import OpenIdConnect
 from httpx import AsyncClient
-
 from jwt import PyJWKClient, decode as jwt_decode
+from pydantic.main import BaseModel
 
 from www.settings import settings
 
@@ -24,7 +23,7 @@ jwks = PyJWKClient(settings.oauth.jwks_url)
 
 
 class User(BaseModel):
-    sub: str
+    id: str
     is_admin: bool
     is_content_manager: bool
     is_moderator: bool
@@ -70,14 +69,14 @@ async def get_user(
 
         # Extract user information from claims and userinfo
         return User(
-            sub=claims["sub"],
+            id=claims["sub"],
             is_admin="www-admin" in groups,
             is_content_manager="www-cm" in groups,
             is_moderator="www-mod" in groups,
         )
 
     except Exception as e:
-        logger.warning(f"Failed to validate token or fetch user info: {e}")
+        logger.warning("Failed to validate token or fetch user info: %s", e)
         return None
 
 

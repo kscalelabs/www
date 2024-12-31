@@ -7,14 +7,11 @@ from boto3.dynamodb.conditions import Key
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ValidationError
 
+from www.app.auth import User, get_user
 from www.app.crud.base import ItemNotFoundError
-from www.app.crud.robots import RobotData
+from www.app.crud.robots import RobotData, RobotsCrud, robots_crud
 from www.app.db import Crud
-from www.app.model import Listing, Robot, User, get_artifact_url
-from www.app.security.user import (
-    get_session_user_with_read_permission,
-    get_session_user_with_write_permission,
-)
+from www.app.model import Listing, Robot, get_artifact_url
 
 router = APIRouter()
 
@@ -32,8 +29,8 @@ class CreateRobotResponse(BaseModel):
 @router.post("/create", response_model=CreateRobotResponse)
 async def create_robot(
     request: CreateRobotRequest,
-    user: Annotated[User, Depends(get_session_user_with_write_permission)],
-    crud: Annotated[Crud, Depends(Crud.get)],
+    user: Annotated[User, Depends(get_user)],
+    crud: Annotated[RobotsCrud, Depends(robots_crud)],
 ) -> CreateRobotResponse:
     """Create a new robot."""
     try:
@@ -55,8 +52,8 @@ async def create_robot(
 @router.get("/get/{robot_id}", response_model=Robot)
 async def get_robot(
     robot_id: str,
-    user: Annotated[User, Depends(get_session_user_with_read_permission)],
-    crud: Annotated[Crud, Depends(Crud.get)],
+    user: Annotated[User, Depends(get_user)],
+    crud: Annotated[RobotsCrud, Depends(robots_crud)],
 ) -> Robot:
     """Get a specific robot."""
     try:
@@ -106,8 +103,8 @@ class RobotListResponse(BaseModel):
 
 @router.get("/list", response_model=RobotListResponse)
 async def list_user_robots(
-    user: User = Depends(get_session_user_with_read_permission),
-    crud: Crud = Depends(Crud.get),
+    user: User = Depends(get_user),
+    crud: RobotsCrud = Depends(robots_crud),
 ) -> RobotListResponse:
     """List all robots for the current user."""
     robots = await crud.get_robots_by_user_id(user.id)
@@ -166,8 +163,8 @@ class UpdateRobotRequest(BaseModel):
 async def update_robot(
     robot_id: str,
     update_data: UpdateRobotRequest,
-    user: User = Depends(get_session_user_with_write_permission),
-    crud: Crud = Depends(Crud.get),
+    user: User = Depends(get_user),
+    crud: RobotsCrud = Depends(robots_crud),
 ) -> Robot:
     """Update a robot's information."""
     try:
@@ -193,8 +190,8 @@ async def update_robot(
 @router.delete("/delete/{robot_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_robot(
     robot_id: str,
-    user: User = Depends(get_session_user_with_write_permission),
-    crud: Crud = Depends(Crud.get),
+    user: User = Depends(get_user),
+    crud: RobotsCrud = Depends(robots_crud),
 ) -> None:
     """Delete a robot."""
     try:
@@ -216,7 +213,7 @@ class RobotURDFResponse(BaseModel):
 @router.get("/urdf/{listing_id}", response_model=RobotURDFResponse)
 async def get_robot_urdf(
     listing_id: str,
-    crud: Crud = Depends(Crud.get),
+    crud: RobotsCrud = Depends(robots_crud),
 ) -> RobotURDFResponse:
     """Get the URDF for a robot."""
     artifacts = await crud.get_listing_artifacts(

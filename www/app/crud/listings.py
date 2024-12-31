@@ -8,8 +8,7 @@ from typing import Any, Callable, Literal, Type, TypeVar, overload
 
 from boto3.dynamodb.conditions import Attr
 
-from www.app.crud.artifacts import ArtifactsCrud
-from www.app.crud.base import TABLE_NAME, BaseCrud, ItemNotFoundError
+from www.app.crud.base import TABLE_NAME, BaseDbCrud, ItemNotFoundError
 from www.app.model import Listing, ListingTag, ListingVote, User
 
 T = TypeVar("T")
@@ -23,7 +22,7 @@ class SortOption(str, Enum):
     MOST_UPVOTED = "most_upvoted"
 
 
-class ListingsCrud(ArtifactsCrud, BaseCrud):
+class ListingsCrud(BaseDbCrud):
     PAGE_SIZE = 20
 
     @classmethod
@@ -131,10 +130,6 @@ class ListingsCrud(ArtifactsCrud, BaseCrud):
 
     async def add_listing(self, listing: Listing) -> None:
         await self._add_item(listing)
-
-    async def _delete_listing_artifacts(self, listing: Listing) -> None:
-        artifacts = await self.get_listing_artifacts(listing.id)
-        await asyncio.gather(*[self.remove_artifact(artifact) for artifact in artifacts])
 
     async def _delete_listing_tags(self, listing_id: str) -> None:
         listing_tags = await self._get_items_from_secondary_index("listing_id", listing_id, ListingTag)

@@ -8,7 +8,7 @@ from fastapi.requests import Request
 from fastapi.responses import RedirectResponse
 from pydantic.main import BaseModel
 
-from www.app.auth import UserInfo, require_user_info, require_user, User
+from www.app.auth import User, UserInfo, require_user, require_user_info
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class UserResponse(BaseModel):
 @router.get("/user")
 async def user(user: Annotated[User, Depends(require_user)]) -> UserResponse:
     return UserResponse(
-        user_id=user.sub,
+        user_id=user.id,
         is_admin=user.is_admin,
         is_content_manager=user.is_content_manager,
         is_moderator=user.is_moderator,

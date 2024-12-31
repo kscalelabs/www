@@ -16,7 +16,7 @@ from kol.onshape.download import download
 from kol.onshape.postprocess import postprocess
 from PIL import Image
 
-from www.app.crud.base import BaseCrud
+from www.app.crud.base import BaseDbCrud
 from www.app.crud.listings import ListingsCrud
 from www.app.model import Listing
 
@@ -76,7 +76,7 @@ def capture_logs(
             h.setLevel(lvl)
 
 
-class OnshapeCrud(ListingsCrud, BaseCrud):
+class OnshapeCrud(ListingsCrud, BaseDbCrud):
     async def onshape_document_exists(self, onshape_url: str) -> bool:
         client = OnshapeClient()
         api = OnshapeApi(client)

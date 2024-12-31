@@ -1,6 +1,7 @@
 """Defines the base CRUD interface."""
 
 import asyncio
+import functools
 import itertools
 import logging
 from abc import ABC, abstractmethod
@@ -8,13 +9,13 @@ from typing import (
     IO,
     Any,
     AsyncContextManager,
+    AsyncGenerator,
     Callable,
     Literal,
     Self,
     TypeVar,
     overload,
 )
-import functools
 
 import aioboto3
 from aiobotocore.response import StreamingBody
@@ -26,7 +27,6 @@ from types_aiobotocore_s3.service_resource import S3ServiceResource
 from www.app.errors import InternalError, ItemNotFoundError
 from www.app.model import StoreBaseModel
 from www.settings import settings
-from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ TableKey = tuple[str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 GlobalSecondaryIndex = tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 
 
-class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
+class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
     def __init__(self) -> None:
         super().__init__()
 
@@ -59,15 +59,19 @@ class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
 
     @functools.cached_property
     def table_name(self) -> str:
-        return f"{self._get_table_name()}-{settings.dynamo.table_suffix}"
+        return f"www-{self._get_table_name()}-{settings.dynamo.table_suffix}"
 
     @property
     async def table(self) -> Table:
         return await self.db.Table(self.table_name)
 
     @classmethod
+    def get_keys(cls) -> list[TableKey]:
+        return [("id", "S", "HASH")]
+
+    @classmethod
     def get_gsis(cls) -> set[str]:
-        return {"type"}
+        return set()
 
     @classmethod
     def get_gsi_index_name(cls, colname: str) -> str:
@@ -92,6 +96,11 @@ class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
 
     async def __call__(self) -> AsyncGenerator[Self, None]:
         async with self as crud:
+            yield crud
+
+    @classmethod
+    async def get(cls) -> AsyncGenerator[Self, None]:
+        async with cls() as crud:
             yield crud
 
     async def _add_item(self, item: StoreBaseModel, unique_fields: list[str] | None = None) -> None:
@@ -412,24 +421,14 @@ class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
                 raise ItemNotFoundError(f"Item not found or is not of type {model_type.__name__}")
             raise
 
-    async def _create_dynamodb_table(
-        self,
-        keys: list[TableKey],
-        gsis: list[GlobalSecondaryIndex] | None = None,
-        deletion_protection: bool = False,
-    ) -> None:
-        """Creates a table in the Dynamo database if a table of that name does not already exist.
+    async def create_dynamodb_table(self) -> None:
+        """Creates a table in the Dynamo database if a table of that name does not already exist."""
+        keys = self.get_keys()
+        gsis_set = self.get_gsis()
+        gsis: list[tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]] = [
+            (self.get_gsi_index_name(g), g, "S", "HASH") for g in gsis_set
+        ]
 
-        Args:
-            name: Name of the table.
-            keys: Primary and secondary keys. Do not include non-key attributes.
-            gsis: Making an attribute a GSI is required in order to query
-                against it. Note HASH on a GSI does not actually enforce
-                uniqueness. Instead, the difference is: you cannot query
-                RANGE fields alone, but you may query HASH fields.
-            deletion_protection: Whether the table is protected from being
-                deleted.
-        """
         try:
             await self.db.meta.client.describe_table(TableName=self.table_name)
             logger.info("Found existing table %s", self.table_name)
@@ -454,7 +453,7 @@ class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
                             for i, n, _, t in gsis
                         ]
                     ),
-                    DeletionProtectionEnabled=deletion_protection,
+                    DeletionProtectionEnabled=settings.dynamo.deletion_protection,
                     BillingMode="PAY_PER_REQUEST",
                 )
 
@@ -465,13 +464,13 @@ class BaseCrud(AsyncContextManager["BaseCrud"], ABC):
                     ],
                     TableName=self.table_name,
                     KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
-                    DeletionProtectionEnabled=deletion_protection,
+                    DeletionProtectionEnabled=settings.dynamo.deletion_protection,
                     BillingMode="PAY_PER_REQUEST",
                 )
 
             await table.wait_until_exists()
 
-    async def _delete_dynamodb_table(self) -> None:
+    async def delete_dynamodb_table(self) -> None:
         """Deletes a table in the Dynamo database.
 
         Args:
@@ -615,7 +614,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"]):
         bucket = await self.s3.Bucket(settings.s3.bucket)
         await bucket.delete_objects(Delete={"Objects": [{"Key": f"{settings.s3.prefix}{filename}"}]})
 
-    async def _create_s3_bucket(self) -> None:
+    async def create_s3_bucket(self) -> None:
         """Creates an S3 bucket if it does not already exist."""
         try:
             await self.s3.meta.client.head_bucket(Bucket=settings.s3.bucket)
@@ -675,7 +674,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"]):
             logger.error("Failed to generate presigned URL: %s", e)
             raise
 
-    async def _delete_s3_bucket(self) -> None:
+    async def delete_s3_bucket(self) -> None:
         """Deletes an S3 bucket."""
         bucket = await self.s3.Bucket(settings.s3.bucket)
         logger.info("Deleting bucket %s", settings.s3.bucket)
@@ -685,4 +684,9 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"]):
 
     async def __call__(self) -> AsyncGenerator[Self, None]:
         async with self as crud:
+            yield crud
+
+    @classmethod
+    async def get(cls) -> AsyncGenerator[Self, None]:
+        async with cls() as crud:
             yield crud

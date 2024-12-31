@@ -8,13 +8,13 @@ from typing import Self
 
 from fastapi import UploadFile
 
-from www.app.crud.base import TABLE_NAME, BaseCrud
+from www.app.crud.base import TABLE_NAME, BaseDbCrud
 from www.app.model import KRec
 
 logger = logging.getLogger(__name__)
 
 
-class KRecsCrud(BaseCrud):
+class KRecsCrud(BaseDbCrud):
     """CRUD operations for KRecs."""
 
     def __init__(self) -> None:

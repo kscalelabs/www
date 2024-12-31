@@ -1,5 +1,3 @@
-oauth:
-  cognito_redirect_uri: http://api.staging.kscale.dev/auth/login
 dynamo:
   table_suffix: staging
 site:

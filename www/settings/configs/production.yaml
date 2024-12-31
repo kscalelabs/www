@@ -1,7 +1,6 @@
-oauth:
-  cognito_redirect_uri: http://api.kscale.dev/auth/login
 dynamo:
   table_suffix: prod
+  deletion_protection: true
 site:
   homepage: https://dashboard.kscale.dev
   artifact_base_url: https://assets.kscale.dev/

@@ -4,10 +4,8 @@
 omegaconf
 pydantic
 
-# Authentication
-authlib
-pycognito
-python-jose
+# Logging
+colorlogging
 
 # AWS dependencies.
 aioboto3
