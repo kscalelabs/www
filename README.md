@@ -15,7 +15,4 @@
 
 # K-Scale Website
 
-This is the codebase for our website.
-
-- [Project tracker](https://github.com/orgs/kscalelabs/projects/8/views/1)
-- [Discord discussion channel](https://discord.gg/kscale)
+This is the codebase for K-Scale's web infrastructure.
