@@ -10,8 +10,8 @@ from typing import Literal, Self, cast, get_args
 
 from pydantic import BaseModel
 
-from www.app.auth import User
-from www.app.errors import InternalError
+from www.auth import User
+from www.errors import InternalError
 from www.settings import settings
 from www.utils import new_uuid
 

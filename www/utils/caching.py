@@ -2,13 +2,8 @@
 
 import datetime
 import functools
-import hashlib
-import io
-import uuid
 from collections import OrderedDict
-from pathlib import Path
 from typing import Awaitable, Callable, Generic, Hashable, ParamSpec, TypeVar, overload
-from xml.etree import ElementTree as ET
 
 Tk = TypeVar("Tk", bound=Hashable)
 Tv = TypeVar("Tv")
@@ -138,40 +133,3 @@ def cache_async_result(
         return wrapper
 
     return decorator
-
-
-def server_time() -> datetime.datetime:
-    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-
-
-def new_uuid() -> str:
-    """Generate a new UUID.
-
-    Returns:
-        A new UUID, as a string, with the first 16 characters of the
-        SHA-256 hash of a UUID4 value.
-    """
-    return hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:16]
-
-
-def save_xml(path: str | Path | io.BytesIO, tree: ET.ElementTree) -> None:
-    root = tree.getroot()
-
-    def indent(elem: ET.Element, level: int = 0) -> ET.Element:
-        i = "\n" + level * "  "
-        if len(elem):
-            if not elem.text or not elem.text.strip():
-                elem.text = i + "  "
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-            for e in elem:
-                indent(e, level + 1)
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-        else:  # noqa: PLR5501
-            if level and (not elem.tail or not elem.tail.strip()):
-                elem.tail = i
-        return elem
-
-    indent(root)
-    tree.write(path, encoding="utf-8", xml_declaration=True, method="xml")

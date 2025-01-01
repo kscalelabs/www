@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Generator, cast
 import pytest
 from _pytest.python import Function
 from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import ASGITransport, AsyncClient
 from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
 from pytest_mock.plugin import MockerFixture, MockType
@@ -69,7 +69,7 @@ def mock_aws() -> Generator[None, None, None]:
 
 @pytest.fixture()
 async def app_client() -> AsyncGenerator[AsyncClient, None]:
-    from www.app.main import app
+    from www.main import app
 
     transport = ASGITransport(cast(_ASGIApp, app))
 
@@ -81,8 +81,8 @@ async def app_client() -> AsyncGenerator[AsyncClient, None]:
 def test_client() -> Generator[TestClient, None, None]:
     import asyncio
 
-    from www.app.db import Crud, create_tables
-    from www.app.main import app
+    from www.db import Crud, create_tables
+    from www.main import app
 
     async def setup() -> None:
         async with Crud() as crud:
@@ -96,34 +96,6 @@ def test_client() -> Generator[TestClient, None, None]:
 
 @pytest.fixture(autouse=True)
 def mock_send_email(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.utils.email.send_email")
+    mock = mocker.patch("www.utils.email.send_email")
     mock.return_value = None
-    return mock
-
-
-@pytest.fixture(autouse=True)
-def mock_github_access_token(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_access_token_req")
-    mock.return_value = Response(status_code=200, json={"access_token": ""})
-    return mock
-
-
-@pytest.fixture(autouse=True)
-def mock_github(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_req")
-    mock.return_value = Response(status_code=200, json={"html_url": "https://github.com/kscalelabs"})
-    return mock
-
-
-@pytest.fixture(autouse=True)
-def mock_github_email(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_email_req")
-    mock.return_value = Response(status_code=200, json=[{"email": "github-user@kscale.dev", "primary": True}])
-    return mock
-
-
-@pytest.fixture(autouse=True)
-def mock_google_user_data(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.google.get_google_user_data")
-    mock.return_value = {"email": "google-user@kscale.dev", "given_name": "Test", "family_name": "User"}
     return mock

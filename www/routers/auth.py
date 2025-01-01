@@ -8,7 +8,7 @@ from fastapi.requests import Request
 from fastapi.responses import RedirectResponse
 from pydantic.main import BaseModel
 
-from www.app.auth import User, UserInfo, require_user, require_user_info
+from www.auth import User, UserInfo, require_user, require_user_info
 
 logger = logging.getLogger(__name__)
 

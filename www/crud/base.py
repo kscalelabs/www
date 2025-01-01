@@ -24,8 +24,8 @@ from botocore.exceptions import ClientError
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 from types_aiobotocore_s3.service_resource import S3ServiceResource
 
-from www.app.errors import InternalError, ItemNotFoundError
-from www.app.model import StoreBaseModel
+from www.errors import InternalError, ItemNotFoundError
+from www.model import StoreBaseModel
 from www.settings import settings
 
 logger = logging.getLogger(__name__)

@@ -189,7 +189,7 @@ uv pip install -r www/requirements.txt -r www/requirements-dev.txt  # Using uv
 Initialize the test databases with:
 
 ```bash
-python -m www.app.db create
+python -m www.db create
 ```
 
 ### Running the FastAPI Application

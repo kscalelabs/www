@@ -5,7 +5,7 @@
 # ------------------------ #
 
 start:
-	@if [ -f env.sh ]; then source env.sh; fi; fastapi dev 'www/app/main.py' --host localhost --port 8080
+	@if [ -f env.sh ]; then source env.sh; fi; fastapi dev 'www/main.py' --host localhost --port 8080
 .PHONY: start
 
 update-api:

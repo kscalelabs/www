@@ -5,8 +5,8 @@ import asyncio
 
 import colorlogging
 
-from www.app.crud.base import BaseDbCrud, BaseS3Crud
-from www.app.crud.robots import RobotsCrud
+from www.crud.base import BaseDbCrud, BaseS3Crud
+from www.crud.robots import RobotsCrud
 
 Crud = BaseDbCrud | BaseS3Crud
 
@@ -70,5 +70,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    # python -m www.app.db
+    # python -m www.db
     asyncio.run(main())
