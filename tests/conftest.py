@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
-from pytest_mock.plugin import MockerFixture, MockType
+from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
 os.environ["ENVIRONMENT"] = "local"
 
@@ -81,12 +81,11 @@ async def app_client() -> AsyncGenerator[AsyncClient, None]:
 def test_client() -> Generator[TestClient, None, None]:
     import asyncio
 
-    from www.db import Crud, create_tables
+    from www.db import create_tables
     from www.main import app
 
     async def setup() -> None:
-        async with Crud() as crud:
-            await create_tables(crud)
+        await create_tables()
 
     asyncio.run(setup())
 
@@ -98,4 +97,32 @@ def test_client() -> Generator[TestClient, None, None]:
 def mock_send_email(mocker: MockerFixture) -> MockType:
     mock = mocker.patch("www.utils.email.send_email")
     mock.return_value = None
+    return mock
+
+
+@pytest.fixture(autouse=True)
+def mock_get_user(mocker: MockerFixture) -> AsyncMockType:
+    mock = mocker.patch("www.auth._decode_user_from_token")
+
+    from www.auth import User
+
+    mock.return_value = User(
+        id="test_user",
+        is_admin=True,
+        can_upload=True,
+        can_test=True,
+    )
+    return mock
+
+
+@pytest.fixture(autouse=True)
+def mock_get_user_info(mocker: MockerFixture) -> AsyncMockType:
+    mock = mocker.patch("www.auth._decode_user_info_from_token")
+
+    from www.auth import UserInfo
+
+    mock.return_value = UserInfo(
+        email="test@example.com",
+        email_verified=True,
+    )
     return mock

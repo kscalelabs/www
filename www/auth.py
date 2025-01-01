@@ -3,9 +3,9 @@
 import logging
 from typing import Annotated, Callable, Literal
 
-from fastapi import Depends, Request, status
+from fastapi import Depends, Request, Security, status
 from fastapi.exceptions import HTTPException
-from fastapi.security import OpenIdConnect
+from fastapi.security import OpenIdConnect, SecurityScopes
 from httpx import AsyncClient
 from jwt import PyJWKClient, decode as jwt_decode
 from pydantic.main import BaseModel
@@ -29,19 +29,7 @@ class User(BaseModel):
     can_test: bool
 
 
-async def get_user(
-    token: Annotated[str | None, Depends(oidc)],
-) -> User | None:
-    """Gets the user from the OpenID Connect token.
-
-    Args:
-        token: The OpenID Connect token. If this is found, it is a string that
-            looks like "Bearer <token>"
-
-    Returns:
-        The user information parsed from the OpenID Connect token, or None
-        if no token was passed.
-    """
+def _decode_user_from_token(token: str | None) -> User | None:
     if token is None:
         return None
 
@@ -90,6 +78,40 @@ async def get_user(
     return user
 
 
+async def get_user(
+    security_scopes: SecurityScopes,
+    token: Annotated[str | None, Depends(oidc)],
+) -> User | None:
+    """Gets the user from the OpenID Connect token.
+
+    Args:
+        security_scopes: The security scopes required for the endpoint
+        token: The OpenID Connect token. If this is found, it is a string that
+            looks like "Bearer <token>"
+
+    Returns:
+        The user information parsed from the OpenID Connect token, or None
+        if no token was passed.
+    """
+    user = _decode_user_from_token(token)
+
+    if user and security_scopes.scopes:
+        for scope in security_scopes.scopes:
+            if scope == "admin" and not user.is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions",
+                    headers={"WWW-Authenticate": f"Bearer scope={security_scopes.scope_str}"},
+                )
+            elif scope == "upload" and not user.can_upload:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions",
+                    headers={"WWW-Authenticate": f"Bearer scope={security_scopes.scope_str}"},
+                )
+    return user
+
+
 async def require_user(user: Annotated[User | None, Depends(get_user)]) -> User:
     if user is None:
         raise HTTPException(
@@ -100,15 +122,10 @@ async def require_user(user: Annotated[User | None, Depends(get_user)]) -> User:
 
 
 def require_permissions(permissions: set[Literal["admin", "upload"]]) -> Callable[[User], User]:
-    def decorator(user: Annotated[User, Depends(require_user)]) -> User:
-        if ("admin" in permissions and not user.is_admin) or ("upload" in permissions and not user.can_upload):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User does not have {permissions} permissions",
-            )
+    async def dependency(user: Annotated[User, Security(get_user, scopes=list(permissions))]) -> User:
         return user
 
-    return decorator
+    return dependency
 
 
 class UserInfo(BaseModel):
@@ -116,14 +133,7 @@ class UserInfo(BaseModel):
     email_verified: bool
 
 
-async def require_user_info(
-    request: Request,
-    token: Annotated[str | None, Depends(oidc)],
-    user: Annotated[User, Depends(require_user)],
-) -> UserInfo:
-    if "userinfo" in request.session:
-        return UserInfo(**request.session["userinfo"])
-
+async def _decode_user_info_from_token(token: str | None) -> UserInfo | None:
     async with AsyncClient() as client:
         # Gets the metadata from the OpenID Connect server.
         metadata_response = await client.get(settings.oauth.server_metadata_url)
@@ -151,9 +161,14 @@ async def require_user_info(
     userinfo = UserInfo(
         email=email,
         email_verified=email_verified_str == "true",
-        user=user,
     )
 
-    request.session["userinfo"] = userinfo.model_dump()
+    return userinfo
 
+
+async def require_user_info(request: Request, token: Annotated[str | None, Depends(oidc)]) -> UserInfo:
+    if "userinfo" in request.session:
+        return UserInfo(**request.session["userinfo"])
+    userinfo = await _decode_user_info_from_token(token)
+    request.session["userinfo"] = userinfo.model_dump()
     return userinfo

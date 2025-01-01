@@ -5,7 +5,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.requests import Request
-from fastapi.responses import RedirectResponse
 from pydantic.main import BaseModel
 
 from www.auth import User, UserInfo, require_user, require_user_info
@@ -57,10 +56,6 @@ async def profile(
 
 
 @router.get("/logout")
-async def logout(
-    request: Request,
-    user: Annotated[UserResponse, Depends(user)],
-) -> RedirectResponse:
+async def logout(request: Request, user: Annotated[UserResponse, Depends(require_user)]) -> bool:
     request.session.clear()
-    redirect_url = request.url_for("index")
-    return RedirectResponse(url=redirect_url)
+    return True
