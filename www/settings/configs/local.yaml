@@ -10,4 +10,4 @@ cloudfront:
 site:
   homepage: http://127.0.0.1:3000
   artifact_base_url: http://127.0.0.1:4566/artifacts/media/
-  enable_test_endpoint: true
+  is_test_environment: true

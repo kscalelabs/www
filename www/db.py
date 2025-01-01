@@ -5,14 +5,12 @@ import asyncio
 
 import colorlogging
 
-from www.crud.base import BaseDbCrud, BaseS3Crud
-from www.crud.robots import RobotsCrud
+from www.crud.base.db import BaseDbCrud
+from www.crud.base.s3 import BaseS3Crud
 
 Crud = BaseDbCrud | BaseS3Crud
 
-CRUDS: list[Crud] = [
-    RobotsCrud(),
-]
+CRUDS: list[Crud] = []
 
 
 async def create_tables() -> None:

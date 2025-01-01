@@ -3,4 +3,4 @@ dynamo:
 site:
   homepage: https://dashboard-staging.kscale.dev
   artifact_base_url: https://stagingassets.kscale.dev/
-  enable_test_endpoint: true
+  is_test_environment: true

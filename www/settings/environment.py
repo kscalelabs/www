@@ -59,7 +59,7 @@ class S3Settings:
 
 @dataclass
 class DynamoSettings:
-    table_suffix: str = field(default=MISSING)
+    table_suffix: str = field(default=SI("-${environment}"))
     deletion_protection: bool = field(default=False)
 
 
@@ -67,7 +67,7 @@ class DynamoSettings:
 class SiteSettings:
     homepage: str = field(default=MISSING)
     artifact_base_url: str = field(default=MISSING)
-    enable_test_endpoint: bool = field(default=False)
+    is_test_environment: bool = field(default=False)
 
 
 @dataclass

@@ -25,8 +25,8 @@ jwks = PyJWKClient(settings.oauth.jwks_url)
 class User(BaseModel):
     id: str
     is_admin: bool
-    is_content_manager: bool
-    is_moderator: bool
+    can_upload: bool
+    can_test: bool
 
 
 async def get_user(
@@ -68,16 +68,26 @@ async def get_user(
         groups = claims.get("cognito:groups", [])
 
         # Extract user information from claims and userinfo
-        return User(
+        user = User(
             id=claims["sub"],
             is_admin="www-admin" in groups,
-            is_content_manager="www-cm" in groups,
-            is_moderator="www-mod" in groups,
+            can_upload="www-upload" in groups,
+            can_test="www-test" in groups,
         )
 
     except Exception as e:
-        logger.warning("Failed to validate token or fetch user info: %s", e)
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Failed to validate token",
+        ) from e
+
+    if settings.site.is_test_environment and not user.can_test:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have test permissions",
+        )
+
+    return user
 
 
 async def require_user(user: Annotated[User | None, Depends(get_user)]) -> User:
@@ -89,13 +99,9 @@ async def require_user(user: Annotated[User | None, Depends(get_user)]) -> User:
     return user
 
 
-def require_permissions(permissions: set[Literal["admin", "content_manager", "moderator"]]) -> Callable[[User], User]:
+def require_permissions(permissions: set[Literal["admin", "upload"]]) -> Callable[[User], User]:
     def decorator(user: Annotated[User, Depends(require_user)]) -> User:
-        if (
-            ("admin" in permissions and not user.is_admin)
-            or ("content_manager" in permissions and not user.is_content_manager)
-            or ("moderator" in permissions and not user.is_moderator)
-        ):
+        if ("admin" in permissions and not user.is_admin) or ("upload" in permissions and not user.can_upload):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"User does not have {permissions} permissions",

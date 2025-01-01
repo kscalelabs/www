@@ -18,8 +18,8 @@ router = APIRouter()
 class UserResponse(BaseModel):
     user_id: str
     is_admin: bool
-    is_content_manager: bool
-    is_moderator: bool
+    can_upload: bool
+    can_test: bool
 
 
 @router.get("/user")
@@ -27,8 +27,8 @@ async def user(user: Annotated[User, Depends(require_user)]) -> UserResponse:
     return UserResponse(
         user_id=user.id,
         is_admin=user.is_admin,
-        is_content_manager=user.is_content_manager,
-        is_moderator=user.is_moderator,
+        can_upload=user.can_upload,
+        can_test=user.can_test,
     )
 
 
@@ -57,7 +57,10 @@ async def profile(
 
 
 @router.get("/logout")
-async def logout(request: Request) -> RedirectResponse:
+async def logout(
+    request: Request,
+    user: Annotated[UserResponse, Depends(user)],
+) -> RedirectResponse:
     request.session.clear()
     redirect_url = request.url_for("index")
     return RedirectResponse(url=redirect_url)

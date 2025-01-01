@@ -4,4 +4,4 @@ dynamo:
 site:
   homepage: https://dashboard.kscale.dev
   artifact_base_url: https://assets.kscale.dev/
-  enable_test_endpoint: false
+  is_test_environment: false

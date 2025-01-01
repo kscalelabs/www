@@ -1,4 +1,4 @@
-"""Defines the base CRUD interface."""
+"""Defines a base CRUD interface for interacting with DynamoDB."""
 
 import asyncio
 import functools
@@ -6,7 +6,6 @@ import itertools
 import logging
 from abc import ABC, abstractmethod
 from typing import (
-    IO,
     Any,
     AsyncContextManager,
     AsyncGenerator,
@@ -18,19 +17,18 @@ from typing import (
 )
 
 import aioboto3
-from aiobotocore.response import StreamingBody
 from boto3.dynamodb.conditions import Attr, ComparisonCondition, Key
 from botocore.exceptions import ClientError
+from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
-from types_aiobotocore_s3.service_resource import S3ServiceResource
 
+from www.auth import User
 from www.errors import InternalError, ItemNotFoundError
-from www.model import StoreBaseModel
 from www.settings import settings
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T", bound=StoreBaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_CHUNK_SIZE = 100
 DEFAULT_SCAN_LIMIT = 1000
@@ -45,11 +43,14 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
         super().__init__()
 
         self.__db: DynamoDBServiceResource | None = None
-        self.__s3: S3ServiceResource | None = None
 
     @abstractmethod
     def _get_table_name(self) -> str:
         """Returns the name of the table."""
+
+    @abstractmethod
+    def delete_user_data(self, user: User) -> None:
+        """Deletes all data for a user."""
 
     @property
     def db(self) -> DynamoDBServiceResource:
@@ -59,7 +60,7 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
 
     @functools.cached_property
     def table_name(self) -> str:
-        return f"www-{self._get_table_name()}-{settings.dynamo.table_suffix}"
+        return f"www-{self._get_table_name()}{settings.dynamo.table_suffix}"
 
     @property
     async def table(self) -> Table:
@@ -103,7 +104,7 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
         async with cls() as crud:
             yield crud
 
-    async def _add_item(self, item: StoreBaseModel, unique_fields: list[str] | None = None) -> None:
+    async def _add_item(self, item: T, unique_fields: list[str] | None = None) -> None:
         table = await self.table
         item_data = item.model_dump()
 
@@ -134,7 +135,7 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
             logger.exception("Failed to insert item into DynamoDB")
             raise
 
-    async def _delete_item(self, item: StoreBaseModel | str) -> None:
+    async def _delete_item(self, item: T | str) -> None:
         table = await self.table
         await table.delete_item(Key={"id": item if isinstance(item, str) else item.id})
 
@@ -547,146 +548,3 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
                 str(e),
             )
             raise
-
-
-class BaseS3Crud(AsyncContextManager["BaseS3Crud"]):
-
-    @property
-    def s3(self) -> S3ServiceResource:
-        if self.__s3 is None:
-            raise RuntimeError("Must call __aenter__ first!")
-        return self.__s3
-
-    async def __aenter__(self) -> Self:
-        session = aioboto3.Session()
-        s3 = session.resource("s3")
-        _, s3 = await asyncio.gather(super().__aenter__(), s3.__aenter__())
-        self.__s3 = s3
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # noqa: ANN401
-        to_close = []
-        if self.__s3 is not None:
-            to_close.append(self.__s3)
-        await asyncio.gather(
-            super().__aexit__(exc_type, exc_val, exc_tb),
-            *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
-        )
-
-    async def _upload_to_s3(self, data: IO[bytes], name: str, filename: str, content_type: str) -> None:
-        """Uploads some data to S3."""
-        try:
-            bucket = await self.s3.Bucket(settings.s3.bucket)
-
-            sanitized_name = name.replace("\u202f", " ").replace("\xa0", " ")
-
-            await bucket.put_object(
-                Key=f"{settings.s3.prefix}{filename}",
-                Body=data,
-                ContentType=content_type,
-                ContentDisposition=f'attachment; filename="{sanitized_name}"',
-            )
-            logger.info("S3 upload successful")
-        except ClientError as e:
-            logger.exception("S3 upload failed: %s", e)
-            raise
-
-    async def _download_from_s3(self, filename: str) -> StreamingBody:
-        """Downloads an object from S3.
-
-        Args:
-            filename: The filename of the object to download.
-
-        Returns:
-            The object data.
-        """
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        obj = await bucket.Object(f"{settings.s3.prefix}{filename}")
-        data = await obj.get()
-        return data["Body"]
-
-    async def _delete_from_s3(self, filename: str) -> None:
-        """Deletes an object from S3.
-
-        Args:
-            filename: The filename of the object to delete.
-        """
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        await bucket.delete_objects(Delete={"Objects": [{"Key": f"{settings.s3.prefix}{filename}"}]})
-
-    async def create_s3_bucket(self) -> None:
-        """Creates an S3 bucket if it does not already exist."""
-        try:
-            await self.s3.meta.client.head_bucket(Bucket=settings.s3.bucket)
-            logger.info("Found existing bucket %s", settings.s3.bucket)
-        except ClientError:
-            logger.info("Creating %s bucket", settings.s3.bucket)
-            await self.s3.create_bucket(Bucket=settings.s3.bucket)
-
-            logger.info("Updating %s CORS configuration", settings.s3.bucket)
-            s3_cors = await self.s3.BucketCors(settings.s3.bucket)
-            await s3_cors.put(
-                CORSConfiguration={
-                    "CORSRules": [
-                        {
-                            "AllowedHeaders": ["*"],
-                            "AllowedMethods": ["GET"],
-                            "AllowedOrigins": ["*"],
-                            "ExposeHeaders": ["ETag"],
-                        }
-                    ]
-                },
-            )
-
-    async def generate_presigned_upload_url(
-        self,
-        filename: str,
-        s3_key: str,
-        content_type: str,
-        checksum_algorithm: str = "SHA256",
-        expires_in: int = 3600,
-    ) -> str:
-        """Generates a presigned URL for uploading a file to S3.
-
-        Args:
-            filename: Original filename for Content-Disposition
-            s3_key: The S3 key where the file will be stored
-            content_type: The content type of the file
-            checksum_algorithm: Algorithm used for upload integrity verification (SHA256, SHA1, CRC32)
-            expires_in: Number of seconds until URL expires
-
-        Returns:
-            Presigned URL for uploading
-        """
-        try:
-            return await self.s3.meta.client.generate_presigned_url(
-                ClientMethod="put_object",
-                Params={
-                    "Bucket": settings.s3.bucket,
-                    "Key": f"{settings.s3.prefix}{s3_key}",
-                    "ContentType": content_type,
-                    "ContentDisposition": f'attachment; filename="{filename}"',
-                    "ChecksumAlgorithm": checksum_algorithm,
-                },
-                ExpiresIn=expires_in,
-            )
-        except ClientError as e:
-            logger.error("Failed to generate presigned URL: %s", e)
-            raise
-
-    async def delete_s3_bucket(self) -> None:
-        """Deletes an S3 bucket."""
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        logger.info("Deleting bucket %s", settings.s3.bucket)
-        async for obj in bucket.objects.all():
-            await obj.delete()
-        await bucket.delete()
-
-    async def __call__(self) -> AsyncGenerator[Self, None]:
-        async with self as crud:
-            yield crud
-
-    @classmethod
-    async def get(cls) -> AsyncGenerator[Self, None]:
-        async with cls() as crud:
-            yield crud
