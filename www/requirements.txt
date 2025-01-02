@@ -11,8 +11,8 @@ colorlogging
 aioboto3
 
 # Crypto dependencies
-bcrypt
 cryptography
+jwt
 
 # FastAPI dependencies.
 aiosmtplib
