@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from www.auth import User
 from www.errors import InternalError
 from www.settings import settings
-from www.utils import new_uuid
+from www.utils.db import new_uuid
 
 
 class StoreBaseModel(BaseModel):
@@ -343,7 +343,7 @@ async def can_write_artifact(user: User, artifact: Artifact) -> bool:
 
 
 async def can_write_listing(user: User, listing: Listing) -> bool:
-    if user.is_admin or user.is_moderator:
+    if user.is_admin:
         return True
     if user.id == listing.user_id:
         return True

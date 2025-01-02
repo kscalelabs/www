@@ -2,28 +2,22 @@
 
 import asyncio
 import functools
-import itertools
 import logging
 from abc import ABC, abstractmethod
 from typing import (
     Any,
     AsyncContextManager,
     AsyncGenerator,
-    Callable,
     Literal,
     Self,
     TypeVar,
-    overload,
 )
 
 import aioboto3
-from boto3.dynamodb.conditions import Attr, ComparisonCondition, Key
-from botocore.exceptions import ClientError
 from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 
 from www.auth import User
-from www.errors import InternalError, ItemNotFoundError
 from www.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -38,7 +32,7 @@ TableKey = tuple[str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 GlobalSecondaryIndex = tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]
 
 
-class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
+class DBCrud(AsyncContextManager["DBCrud"], ABC):
     def __init__(self) -> None:
         super().__init__()
 
@@ -79,12 +73,11 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
         return f"{colname}_index"
 
     async def __aenter__(self) -> Self:
-        ctx = await super().__aenter__()
+        await super().__aenter__()
         session = aioboto3.Session()
         db = session.resource("dynamodb")
-        _, db = await asyncio.gather(super().__aenter__(), db.__aenter__())
-        ctx.__db = db
-        return ctx
+        self.__db = await db.__aenter__()
+        return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # noqa: ANN401
         to_close = []
@@ -99,452 +92,7 @@ class BaseDbCrud(AsyncContextManager["BaseDbCrud"], ABC):
         async with self as crud:
             yield crud
 
-    @classmethod
-    async def get(cls) -> AsyncGenerator[Self, None]:
-        async with cls() as crud:
-            yield crud
-
-    async def _add_item(self, item: T, unique_fields: list[str] | None = None) -> None:
-        table = await self.table
-        item_data = item.model_dump()
-
-        # Ensure no empty strings are present
-        item_data = {k: v for k, v in item_data.items() if v is not None and v != ""}
-
-        # DynamoDB-specific requirements
-        if "type" in item_data:
-            raise InternalError("Cannot add item with 'type' attribute")
-        item_data["type"] = item.__class__.__name__
-
-        # Prepare the condition expression
-        condition = "attribute_not_exists(id)"
-        if unique_fields:
-            for field in unique_fields:
-                assert hasattr(item, field), f"Item does not have field {field}"
-            condition += " AND " + " AND ".join(f"attribute_not_exists({field})" for field in unique_fields)
-
-        # Log the item data before insertion for debugging purposes
-        logger.info("Inserting item into DynamoDB: %s", item_data)
-
-        try:
-            await table.put_item(
-                Item=item_data,
-                ConditionExpression=condition,
-            )
-        except ClientError:
-            logger.exception("Failed to insert item into DynamoDB")
-            raise
-
-    async def _delete_item(self, item: T | str) -> None:
-        table = await self.table
-        await table.delete_item(Key={"id": item if isinstance(item, str) else item.id})
-
-    async def _list_items(
-        self,
-        item_class: type[T],
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        filter_expression: str | None = None,
-        offset: int | None = None,
-        limit: int = DEFAULT_SCAN_LIMIT,
-    ) -> list[T]:
-        table = await self.table
-
-        query_params = {
-            "IndexName": "type_index",
-            "KeyConditionExpression": Key("type").eq(item_class.__name__),
-            "Limit": limit,
-        }
-
-        if expression_attribute_names:
-            query_params["ExpressionAttributeNames"] = expression_attribute_names
-        if expression_attribute_values:
-            query_params["ExpressionAttributeValues"] = expression_attribute_values
-        if filter_expression:
-            query_params["FilterExpression"] = filter_expression
-        if offset:
-            query_params["ExclusiveStartKey"] = {"id": offset}
-
-        items = (await table.query(**query_params))["Items"]
-        return [self._validate_item(item, item_class) for item in items]
-
-    async def _list(
-        self,
-        item_class: type[T],
-        page: int,
-        sort_key: Callable[[T], int] | None = None,
-        search_query: str | None = None,
-    ) -> tuple[list[T], bool]:
-        """Lists items of a given class.
-
-        Args:
-            item_class: The class of the items to list.
-            page: The page number to list.
-            sort_key: A function that returns the sort key for an item.
-            search_query: A query string to filter items by.
-
-        Returns:
-            A tuple of the items on the page and a boolean indicating whether
-            there are more pages.
-        """
-        if search_query:
-            response = await self._list_items(
-                item_class,
-                filter_expression="contains(#part_name, :query) OR contains(description, :query)",
-                expression_attribute_names={"#part_name": "name"},
-                expression_attribute_values={":query": search_query},
-            )
-        else:
-            response = await self._list_items(item_class)
-        if sort_key is not None:
-            response = sorted(response, key=sort_key, reverse=True)
-        return response[(page - 1) * ITEMS_PER_PAGE : page * ITEMS_PER_PAGE], page * ITEMS_PER_PAGE < len(response)
-
-    async def _list_me(
-        self,
-        item_class: type[T],
-        user_id: str,
-        page: int,
-        sort_key: Callable[[T], int],
-        search_query: str | None = None,
-    ) -> tuple[list[T], bool]:
-        if search_query:
-            response = await self._list_items(
-                item_class,
-                filter_expression="(contains(#p_name, :query) OR contains(description, :query)) AND #p_owner=:user_id",
-                expression_attribute_names={"#p_name": "name", "#p_owner": "user_id"},
-                expression_attribute_values={":query": search_query, ":user_id": user_id},
-            )
-        else:
-            response = await self._list_items(
-                item_class,
-                filter_expression="#p_owner=:user_id",
-                expression_attribute_values={":user_id": user_id},
-                expression_attribute_names={"#p_owner": "user_id"},
-            )
-        sorted_items = sorted(response, key=sort_key, reverse=True)
-        return sorted_items[(page - 1) * ITEMS_PER_PAGE : page * ITEMS_PER_PAGE], page * ITEMS_PER_PAGE < len(response)
-
-    async def _count_items(self, item_class: type[T]) -> int:
-        table = await self.table
-        item_dict = await table.scan(
-            IndexName="type_index",
-            Select="COUNT",
-            FilterExpression=Key("type").eq(item_class.__name__),
-        )
-        return item_dict["Count"]
-
-    def _validate_item(self, data: dict[str, Any], item_class: type[T]) -> T:
-        if (item_type := data.pop("type")) != item_class.__name__:
-            raise InternalError(f"Item type {str(item_type)} is not a {item_class.__name__}")
-        return item_class.model_validate(data)
-
-    @overload
-    async def _get_item(
-        self,
-        item_id: str,
-        item_class: type[T],
-        throw_if_missing: Literal[True],
-    ) -> T: ...
-
-    @overload
-    async def _get_item(
-        self,
-        item_id: str,
-        item_class: type[T],
-        throw_if_missing: bool = False,
-    ) -> T | None: ...
-
-    async def _get_item(self, item_id: str, item_class: type[T], throw_if_missing: bool = False) -> T | None:
-        table = await self.table
-        item_dict = await table.get_item(Key={"id": item_id})
-        if "Item" not in item_dict:
-            if throw_if_missing:
-                raise ItemNotFoundError
-            return None
-        item_data = item_dict["Item"]
-        return self._validate_item(item_data, item_class)
-
-    async def _item_exists(self, item_id: str) -> bool:
-        table = await self.table
-        item_dict = await table.get_item(Key={"id": item_id})
-        return "Item" in item_dict
-
-    async def _get_item_batch(
-        self,
-        item_ids: list[str],
-        item_class: type[T],
-        chunk_size: int = DEFAULT_CHUNK_SIZE,
-    ) -> list[T]:
-        items: list[T] = []
-        for i in range(0, len(item_ids), chunk_size):
-            chunk = item_ids[i : i + chunk_size]
-            keys = [{"id": item_id} for item_id in chunk]
-            response = await self.db.batch_get_item(RequestItems={self.table_name: {"Keys": keys}})
-
-            # Maps the items to their IDs to return them in the correct order.
-            item_ids_to_items: dict[str, T] = {}
-            for item in response["Responses"][self.table_name]:
-                item_impl = self._validate_item(item, item_class)
-                item_ids_to_items[item_impl.id] = item_impl
-
-            items += [item for item in (item_ids_to_items.get(item_id) for item_id in chunk) if item is not None]
-
-        return items
-
-    async def _get_items_from_secondary_index(
-        self,
-        secondary_index_name: str,
-        secondary_index_value: str,
-        item_class: type[T],
-        additional_filter_expression: ComparisonCondition | None = None,
-        limit: int = DEFAULT_SCAN_LIMIT,
-    ) -> list[T]:
-        filter_expression: ComparisonCondition = Key("type").eq(item_class.__name__)
-        if additional_filter_expression is not None:
-            filter_expression &= additional_filter_expression
-        table = await self.table
-        item_dict = await table.query(
-            IndexName=self.get_gsi_index_name(secondary_index_name),
-            KeyConditionExpression=Key(secondary_index_name).eq(secondary_index_value),
-            FilterExpression=filter_expression,
-            Limit=limit,
-        )
-        items = item_dict["Items"]
-        return [self._validate_item(item, item_class) for item in items]
-
-    async def _item_exists_in_secondary_index(
-        self,
-        secondary_index_name: str,
-        secondary_index_value: str,
-        item_class: type[T],
-    ) -> bool:
-        items = await self._get_items_from_secondary_index(secondary_index_name, secondary_index_value, item_class)
-        return len(items) > 0
-
-    async def _get_items_from_secondary_index_batch(
-        self,
-        secondary_index_name: str,
-        secondary_index_values: list[str],
-        item_class: type[T],
-        chunk_size: int = DEFAULT_CHUNK_SIZE,
-    ) -> list[list[T]]:
-        items: list[list[T]] = []
-        table = await self.table
-
-        for i in range(0, len(secondary_index_values), chunk_size):
-            chunk = secondary_index_values[i : i + chunk_size]
-            response = await table.scan(
-                IndexName=self.get_gsi_index_name(secondary_index_name),
-                FilterExpression=(Attr(secondary_index_name).is_in(chunk) & Attr("type").eq(item_class.__name__)),
-            )
-
-            # Maps the items to their IDs.
-            chunk_items = [self._validate_item(item, item_class) for item in response["Items"]]
-            chunk_ids_to_items: dict[str, list[T]] = {}
-            for item in chunk_items:
-                item_id = getattr(item, secondary_index_name)
-                if item_id in chunk_ids_to_items:
-                    chunk_ids_to_items[item_id].append(item)
-                else:
-                    chunk_ids_to_items[item_id] = [item]
-
-            # Adds the items to the list.
-            items += [chunk_ids_to_items.get(id, []) for id in chunk]
-
-        return items
-
-    @overload
-    async def _get_unique_item_from_secondary_index(
-        self,
-        secondary_index_name: str,
-        secondary_index_value: str,
-        item_class: type[T],
-        throw_if_missing: Literal[True],
-    ) -> T: ...
-
-    @overload
-    async def _get_unique_item_from_secondary_index(
-        self,
-        secondary_index_name: str,
-        secondary_index_value: str,
-        item_class: type[T],
-        throw_if_missing: bool = False,
-    ) -> T | None: ...
-
-    async def _get_unique_item_from_secondary_index(
-        self,
-        secondary_index_name: str,
-        secondary_index_value: str,
-        item_class: type[T],
-        throw_if_missing: bool = False,
-    ) -> T | None:
-        if secondary_index_name not in item_class.model_json_schema()["properties"]:
-            raise InternalError(f"Field '{secondary_index_name}' not in model {item_class.__name__}")
-        items = await self._get_items_from_secondary_index(
-            secondary_index_name,
-            secondary_index_value,
-            item_class,
-            limit=2,
-        )
-        if len(items) == 0:
-            if throw_if_missing:
-                raise InternalError(f"No items found with {secondary_index_name} {secondary_index_value}")
-            return None
-        if len(items) > 1:
-            raise InternalError(f"Multiple items found with {secondary_index_name} {secondary_index_value}")
-        return items[0]
-
-    async def _update_item(self, id: str, model_type: type[T], updates: dict[str, Any]) -> None:
-        key = {"id": id}
-
-        # Add condition to ensure we're updating the correct type
-        condition_expression = "#type = :type"
-        update_expression = "SET " + ", ".join(f"#{k} = :{k}" for k in updates.keys())
-
-        expression_attribute_values = {":type": model_type.__name__, **{f":{k}": v for k, v in updates.items()}}
-        expression_attribute_names = {"#type": "type", **{f"#{k}": k for k in updates.keys()}}
-
-        try:
-            await self.db.meta.client.update_item(
-                TableName=self.table_name,
-                Key=key,
-                UpdateExpression=update_expression,
-                ConditionExpression=condition_expression,
-                ExpressionAttributeValues=expression_attribute_values,
-                ExpressionAttributeNames=expression_attribute_names,
-                ReturnValues="NONE",
-            )
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "ValidationException":
-                raise ValueError(f"Invalid update: {str(e)}")
-            elif e.response["Error"]["Code"] == "ConditionalCheckFailedException":
-                raise ItemNotFoundError(f"Item not found or is not of type {model_type.__name__}")
-            raise
-
-    async def create_dynamodb_table(self) -> None:
-        """Creates a table in the Dynamo database if a table of that name does not already exist."""
-        keys = self.get_keys()
-        gsis_set = self.get_gsis()
-        gsis: list[tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]] = [
-            (self.get_gsi_index_name(g), g, "S", "HASH") for g in gsis_set
-        ]
-
-        try:
-            await self.db.meta.client.describe_table(TableName=self.table_name)
-            logger.info("Found existing table %s", self.table_name)
-        except ClientError:
-            logger.info("Creating %s table", self.table_name)
-
-            if gsis:
-                table = await self.db.create_table(
-                    AttributeDefinitions=[
-                        {"AttributeName": n, "AttributeType": t}
-                        for n, t in itertools.chain(((n, t) for (n, t, _) in keys), ((n, t) for _, n, t, _ in gsis))
-                    ],
-                    TableName=self.table_name,
-                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
-                    GlobalSecondaryIndexes=(
-                        [
-                            {
-                                "IndexName": i,
-                                "KeySchema": [{"AttributeName": n, "KeyType": t}],
-                                "Projection": {"ProjectionType": "ALL"},
-                            }
-                            for i, n, _, t in gsis
-                        ]
-                    ),
-                    DeletionProtectionEnabled=settings.dynamo.deletion_protection,
-                    BillingMode="PAY_PER_REQUEST",
-                )
-
-            else:
-                table = await self.db.create_table(
-                    AttributeDefinitions=[
-                        {"AttributeName": n, "AttributeType": t} for n, t in ((n, t) for (n, t, _) in keys)
-                    ],
-                    TableName=self.table_name,
-                    KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
-                    DeletionProtectionEnabled=settings.dynamo.deletion_protection,
-                    BillingMode="PAY_PER_REQUEST",
-                )
-
-            await table.wait_until_exists()
-
-    async def delete_dynamodb_table(self) -> None:
-        """Deletes a table in the Dynamo database.
-
-        Args:
-            name: Name of the table.
-        """
-        try:
-            table = await self.db.Table(self.table_name)
-            await table.delete()
-            logger.info("Deleted table %s", self.table_name)
-        except ClientError:
-            logger.info("Table %s does not exist", self.table_name)
-
     async def _get_by_known_id(self, record_id: str) -> dict[str, Any] | None:
         table = await self.table
         response = await table.get_item(Key={"id": record_id})
         return response.get("Item")
-
-    async def get_file_size(self, filename: str) -> int | None:
-        """Gets the size of a file in S3.
-
-        Args:
-            filename: The name of the file
-
-        Returns:
-            The size in bytes, or None if the file doesn't exist
-        """
-        try:
-            s3_object = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=f"{settings.s3.prefix}{filename}"
-            )
-            return s3_object.get("ContentLength")
-        except ClientError as e:
-            logger.error("Failed to get S3 object size: %s", e)
-            return None
-        except Exception as e:
-            logger.error("Unexpected error getting file size: %s", e)
-            return None
-
-    async def generate_presigned_download_url(
-        self,
-        filename: str,
-        s3_key: str,
-        content_type: str,
-        checksum_algorithm: str = "SHA256",
-        expiration: int = 3600,
-    ) -> tuple[str, str | None]:
-        """Generate a presigned URL for downloading a file from S3 with checksum."""
-        try:
-            full_key = f"{settings.s3.prefix}{s3_key}"
-            head_response = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=full_key, ChecksumMode="ENABLED"
-            )
-            # Cast the response to str | None
-            checksum_value = head_response.get(f"Checksum{checksum_algorithm}")
-            checksum: str | None = str(checksum_value) if checksum_value is not None else None
-
-            url = await self.s3.meta.client.generate_presigned_url(
-                "get_object",
-                Params={
-                    "Bucket": settings.s3.bucket,
-                    "Key": full_key,
-                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
-                    "ResponseContentType": content_type,
-                    "ChecksumMode": "ENABLED",
-                },
-                ExpiresIn=expiration,
-            )
-            return str(url), checksum
-        except Exception as e:
-            logger.error(
-                "Error generating presigned download URL - Bucket: %s, Key: %s: %s",
-                settings.s3.bucket,
-                full_key,
-                str(e),
-            )
-            raise

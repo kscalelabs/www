@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 @pytest.mark.asyncio
 async def test_user_endpoint(test_client: TestClient) -> None:
     response = test_client.get("/auth/user")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.text
+
+    response = test_client.get("/auth/user", headers={"Authorization": "Bearer test"})
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Matches test user data.
@@ -22,6 +25,9 @@ async def test_user_endpoint(test_client: TestClient) -> None:
 @pytest.mark.asyncio
 async def test_profile_endpoint(test_client: TestClient) -> None:
     response = test_client.get("/auth/profile")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.text
+
+    response = test_client.get("/auth/profile", headers={"Authorization": "Bearer test"})
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Matches test user data.

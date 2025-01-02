@@ -1,9 +1,7 @@
 """Defines a base CRUD interface for interacting with S3 buckets."""
 
 import asyncio
-import functools
 import logging
-from abc import ABC, abstractmethod
 from typing import (
     IO,
     Any,
@@ -15,21 +13,17 @@ from typing import (
 import aioboto3
 from aiobotocore.response import StreamingBody
 from botocore.exceptions import ClientError
-from types_aiobotocore_s3.service_resource import Bucket, S3ServiceResource
+from types_aiobotocore_s3.service_resource import S3ServiceResource
 
 from www.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
-class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
+class S3Crud(AsyncContextManager["S3Crud"]):
     def __init__(self) -> None:
         super().__init__()
         self.__s3: S3ServiceResource | None = None
-
-    @abstractmethod
-    def _get_directory(self) -> str:
-        """Returns the name of the directory."""
 
     @property
     def s3(self) -> S3ServiceResource:
@@ -37,19 +31,11 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             raise RuntimeError("Must call __aenter__ first!")
         return self.__s3
 
-    @property
-    def bucket(self) -> Bucket:
-        return self.s3.Bucket(settings.s3.bucket)
-
-    @functools.cached_property
-    def prefix(self) -> str:
-        return f"{settings.s3.prefix}{self._get_directory()}/"
-
     async def __aenter__(self) -> Self:
+        await super().__aenter__()
         session = aioboto3.Session()
         s3 = session.resource("s3")
-        _, s3 = await asyncio.gather(super().__aenter__(), s3.__aenter__())
-        self.__s3 = s3
+        self.__s3 = await s3.__aenter__()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # noqa: ANN401
@@ -61,6 +47,66 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
         )
 
+    async def get_file_size(self, filename: str) -> int | None:
+        """Gets the size of a file in S3.
+
+        Args:
+            filename: The name of the file
+
+        Returns:
+            The size in bytes, or None if the file doesn't exist
+        """
+        try:
+            s3_object = await self.s3.meta.client.head_object(
+                Bucket=settings.s3.bucket, Key=f"{settings.s3.prefix}{filename}"
+            )
+            return s3_object.get("ContentLength")
+        except ClientError as e:
+            logger.error("Failed to get S3 object size: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error getting file size: %s", e)
+            return None
+
+    async def generate_presigned_download_url(
+        self,
+        filename: str,
+        s3_key: str,
+        content_type: str,
+        checksum_algorithm: str = "SHA256",
+        expiration: int = 3600,
+    ) -> tuple[str, str | None]:
+        """Generate a presigned URL for downloading a file from S3 with checksum."""
+        try:
+            full_key = f"{settings.s3.prefix}{s3_key}"
+            head_response = await self.s3.meta.client.head_object(
+                Bucket=settings.s3.bucket, Key=full_key, ChecksumMode="ENABLED"
+            )
+            # Cast the response to str | None
+            checksum_value = head_response.get(f"Checksum{checksum_algorithm}")
+            checksum: str | None = str(checksum_value) if checksum_value is not None else None
+
+            url = await self.s3.meta.client.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": settings.s3.bucket,
+                    "Key": full_key,
+                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
+                    "ResponseContentType": content_type,
+                    "ChecksumMode": "ENABLED",
+                },
+                ExpiresIn=expiration,
+            )
+            return str(url), checksum
+        except Exception as e:
+            logger.error(
+                "Error generating presigned download URL - Bucket: %s, Key: %s: %s",
+                settings.s3.bucket,
+                full_key,
+                str(e),
+            )
+            raise
+
     async def upload_to_s3(self, data: IO[bytes], name: str, filename: str, content_type: str) -> None:
         """Uploads some data to S3."""
         try:
@@ -69,7 +115,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             sanitized_name = name.replace("\u202f", " ").replace("\xa0", " ")
 
             await bucket.put_object(
-                Key=f"{self.prefix}{filename}",
+                Key=f"{settings.s3.prefix}{filename}",
                 Body=data,
                 ContentType=content_type,
                 ContentDisposition=f'attachment; filename="{sanitized_name}"',
@@ -89,7 +135,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             The object data.
         """
         bucket = await self.s3.Bucket(settings.s3.bucket)
-        obj = await bucket.Object(f"{self.prefix}{filename}")
+        obj = await bucket.Object(f"{settings.s3.prefix}{filename}")
         data = await obj.get()
         return data["Body"]
 
@@ -100,31 +146,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             filename: The filename of the object to delete.
         """
         bucket = await self.s3.Bucket(settings.s3.bucket)
-        await bucket.delete_objects(Delete={"Objects": [{"Key": f"{self.prefix}{filename}"}]})
-
-    async def create_s3_bucket(self) -> None:
-        """Creates an S3 bucket if it does not already exist."""
-        try:
-            await self.s3.meta.client.head_bucket(Bucket=settings.s3.bucket)
-            logger.info("Found existing bucket %s", settings.s3.bucket)
-        except ClientError:
-            logger.info("Creating %s bucket", settings.s3.bucket)
-            await self.s3.create_bucket(Bucket=settings.s3.bucket)
-
-            logger.info("Updating %s CORS configuration", settings.s3.bucket)
-            s3_cors = await self.s3.BucketCors(settings.s3.bucket)
-            await s3_cors.put(
-                CORSConfiguration={
-                    "CORSRules": [
-                        {
-                            "AllowedHeaders": ["*"],
-                            "AllowedMethods": ["GET"],
-                            "AllowedOrigins": ["*"],
-                            "ExposeHeaders": ["ETag"],
-                        }
-                    ]
-                },
-            )
+        await bucket.delete_objects(Delete={"Objects": [{"Key": f"{settings.s3.prefix}{filename}"}]})
 
     async def generate_presigned_upload_url(
         self,
@@ -151,7 +173,7 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
                 ClientMethod="put_object",
                 Params={
                     "Bucket": settings.s3.bucket,
-                    "Key": f"{self.prefix}{s3_key}",
+                    "Key": f"{settings.s3.prefix}{s3_key}",
                     "ContentType": content_type,
                     "ContentDisposition": f'attachment; filename="{filename}"',
                     "ChecksumAlgorithm": checksum_algorithm,
@@ -162,19 +184,9 @@ class BaseS3Crud(AsyncContextManager["BaseS3Crud"], ABC):
             logger.error("Failed to generate presigned URL: %s", e)
             raise
 
-    async def delete_s3_bucket(self) -> None:
-        """Deletes an S3 bucket."""
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        logger.info("Deleting bucket %s", settings.s3.bucket)
-        async for obj in bucket.objects.all():
-            await obj.delete()
-        await bucket.delete()
-
     async def __call__(self) -> AsyncGenerator[Self, None]:
         async with self as crud:
             yield crud
 
-    @classmethod
-    async def get(cls) -> AsyncGenerator[Self, None]:
-        async with cls() as crud:
-            yield crud
+
+s3_crud = S3Crud()

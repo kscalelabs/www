@@ -79,15 +79,8 @@ async def app_client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture()
 def test_client() -> Generator[TestClient, None, None]:
-    import asyncio
 
-    from www.db import create_tables
     from www.main import app
-
-    async def setup() -> None:
-        await create_tables()
-
-    asyncio.run(setup())
 
     with TestClient(app) as client:
         yield client

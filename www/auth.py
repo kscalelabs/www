@@ -1,7 +1,7 @@
 """Defines authentication functionality."""
 
 import logging
-from typing import Annotated, Callable, Literal
+from typing import Annotated, Any, Callable, Coroutine, Literal
 
 from fastapi import Depends, Request, Security, status
 from fastapi.exceptions import HTTPException
@@ -29,10 +29,7 @@ class User(BaseModel):
     can_test: bool
 
 
-def _decode_user_from_token(token: str | None) -> User | None:
-    if token is None:
-        return None
-
+def _decode_user_from_token(token: str) -> User:
     # Validates that the token is in the correct format.
     token_parts = token.split(" ")
     if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
@@ -93,6 +90,9 @@ async def get_user(
         The user information parsed from the OpenID Connect token, or None
         if no token was passed.
     """
+    if token is None:
+        return None
+
     user = _decode_user_from_token(token)
 
     if user and security_scopes.scopes:
@@ -121,7 +121,7 @@ async def require_user(user: Annotated[User | None, Depends(get_user)]) -> User:
     return user
 
 
-def require_permissions(permissions: set[Literal["admin", "upload"]]) -> Callable[[User], User]:
+def require_permissions(permissions: set[Literal["admin", "upload"]]) -> Callable[[User], Coroutine[Any, Any, User]]:
     async def dependency(user: Annotated[User, Security(get_user, scopes=list(permissions))]) -> User:
         return user
 
@@ -133,7 +133,7 @@ class UserInfo(BaseModel):
     email_verified: bool
 
 
-async def _decode_user_info_from_token(token: str | None) -> UserInfo | None:
+async def _decode_user_info_from_token(token: str) -> UserInfo:
     async with AsyncClient() as client:
         # Gets the metadata from the OpenID Connect server.
         metadata_response = await client.get(settings.oauth.server_metadata_url)
@@ -169,6 +169,8 @@ async def _decode_user_info_from_token(token: str | None) -> UserInfo | None:
 async def require_user_info(request: Request, token: Annotated[str | None, Depends(oidc)]) -> UserInfo:
     if "userinfo" in request.session:
         return UserInfo(**request.session["userinfo"])
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is not authenticated")
     userinfo = await _decode_user_info_from_token(token)
     request.session["userinfo"] = userinfo.model_dump()
     return userinfo

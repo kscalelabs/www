@@ -1,16 +1,11 @@
 """Defines the main entrypoint for the FastAPI app."""
 
-import logging
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from www.db import create_tables
 from www.errors import (
     BadArtifactError,
     InternalError,
@@ -20,18 +15,6 @@ from www.errors import (
 )
 from www.routers.auth import router as auth_router
 from www.settings import settings
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Initializes the app and creates the database tables."""
-    logging.getLogger("aiobotocore").setLevel(logging.CRITICAL)
-    await create_tables()
-    try:
-        yield
-    finally:
-        pass
-
 
 app = FastAPI(
     title="K-Scale",
