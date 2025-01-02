@@ -1,6 +1,6 @@
 """Tests some common shared data structures."""
 
-from www.utils import LRUCache
+from www.utils.caching import LRUCache
 
 
 def test_lru_cache() -> None:

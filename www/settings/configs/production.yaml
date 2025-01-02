@@ -1,8 +1,7 @@
-crypto:
-  jwt_secret: ${oc.env:JWT_SECRET}
 dynamo:
-  table_name: www
+  table_suffix: prod
+  deletion_protection: true
 site:
   homepage: https://dashboard.kscale.dev
   artifact_base_url: https://assets.kscale.dev/
-  enable_test_endpoint: false
+  is_test_environment: false

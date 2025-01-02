@@ -10,6 +10,7 @@ timeout = 60
 addopts = "-rx -rf -x -q --tb=short"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 markers = [
     "slow: Marks test as being slow",
