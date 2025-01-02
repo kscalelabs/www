@@ -12,7 +12,7 @@ aioboto3
 
 # Crypto dependencies
 cryptography
-jwt
+pyjwt
 
 # FastAPI dependencies.
 aiosmtplib
