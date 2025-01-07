@@ -20,7 +20,7 @@ from www.errors import (
 app = FastAPI(
     title="K-Scale",
     version="1.0.0",
-    docs_url="/",
+    # docs_url="/",
     swagger_ui_oauth2_redirect_url="/callback",
     # swagger_ui_init_oauth={
     #     "appName": "www",
