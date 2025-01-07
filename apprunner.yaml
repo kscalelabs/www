@@ -9,7 +9,7 @@ build:
       - pip install -r www/requirements.txt
       - pip install .
 run:
-  runtime-version: 3.11
+  runtime-version: 3.11.11
   command: fastapi run www/main.py --port 8080
   network:
     port: 8080
