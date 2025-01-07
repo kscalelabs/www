@@ -25,17 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
 
-    env:
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_ENDPOINT_URL_DYNAMODB: http://localhost:8000
-      AWS_REGION: us-east-1
-      CLOUDFRONT_KEY_ID: ${{ vars.CLOUDFRONT_KEY_ID }}
-      CLOUDFRONT_PRIVATE_KEY: ${{ secrets.CLOUDFRONT_PRIVATE_KEY }}
-      CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN }}
-      ONSHAPE_ACCESS_KEY: ${{ secrets.ONSHAPE_ACCESS_KEY }}
-      ONSHAPE_SECRET_KEY: ${{ secrets.ONSHAPE_SECRET_KEY }}
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -47,9 +36,9 @@ jobs:
           path: |
             ${{ env.pythonLocation }}
             .mypy_cache/
-          key: tests-${{ github.event.pull_request.base.sha || github.sha }}
+          key: tests
           restore-keys: |
-            tests-
+            tests
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -76,4 +65,4 @@ jobs:
           path: |
             ${{ env.pythonLocation }}
             .mypy_cache/
-          key: tests-${{ github.event.pull_request.base.sha || github.sha }}
+          key: tests

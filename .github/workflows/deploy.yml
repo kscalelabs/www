@@ -41,7 +41,6 @@ jobs:
         env:
           ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
-          ENVIRONMENT: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
         with:
           context: .
           file: docker/Dockerfile
@@ -49,5 +48,8 @@ jobs:
           tags: ${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}:latest
           build-args: |
             ENVIRONMENT=${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+            MIDDLEWARE_SECRET_KEY=${{ secrets.MIDDLEWARE_SECRET_KEY }}
+            COGNITO_AUTHORITY=${{ vars.COGNITO_AUTHORITY }}
+            COGNITO_CLIENT_ID=${{ vars.COGNITO_CLIENT_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
