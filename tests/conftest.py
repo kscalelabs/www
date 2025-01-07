@@ -12,9 +12,9 @@ from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
 from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
+# Populates environment variables.
 os.environ["ENVIRONMENT"] = "local"
-
-# Populates other environment variables.
+os.environ["MIDDLEWARE_SECRET_KEY"] = "test"
 os.environ["COGNITO_AUTHORITY"] = "test"
 os.environ["COGNITO_CLIENT_ID"] = "test"
 
