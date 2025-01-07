@@ -39,18 +39,16 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         env:
-          ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
+          ECR_IMAGE: ${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}
         with:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}:latest
+          tags: ${{ env.ECR_IMAGE }}:latest
           build-args: |
             ENVIRONMENT=${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
             MIDDLEWARE_SECRET_KEY=${{ secrets.MIDDLEWARE_SECRET_KEY }}
             COGNITO_AUTHORITY=${{ vars.COGNITO_AUTHORITY }}
             COGNITO_CLIENT_ID=${{ vars.COGNITO_CLIENT_ID }}
-          cache-from: |
-            type=registry,ref=${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}:latest
-          cache-to: type=inline
+          cache-from: type=registry,ref=${{ env.ECR_IMAGE }}:latest
+          cache-to: type=registry,ref=${{ env.ECR_IMAGE }}:latest,mode=max
