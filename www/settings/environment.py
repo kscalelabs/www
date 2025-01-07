@@ -2,22 +2,26 @@
 
 from dataclasses import dataclass, field
 
-from omegaconf import II, MISSING
+from omegaconf import II, MISSING, SI
+
+
+@dataclass
+class MiddlewareSettings:
+    secret_key: str = field(default=II("oc.env:MIDDLEWARE_SECRET_KEY"))
 
 
 @dataclass
 class OauthSettings:
-    github_client_id: str = field(default=II("oc.env:GITHUB_CLIENT_ID"))
-    github_client_secret: str = field(default=II("oc.env:GITHUB_CLIENT_SECRET"))
-    google_client_id: str = field(default=II("oc.env:GOOGLE_CLIENT_ID"))
-    google_client_secret: str = field(default=II("oc.env:GOOGLE_CLIENT_SECRET"))
+    cognito_authority: str = field(default=II("oc.env:COGNITO_AUTHORITY"))
+    cognito_client_id: str = field(default=II("oc.env:COGNITO_CLIENT_ID"))
+    jwks_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/jwks.json"))
+    server_metadata_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/openid-configuration"))
 
 
 @dataclass
 class CryptoSettings:
     cache_token_db_result_seconds: int = field(default=30)
     expire_otp_minutes: int = field(default=10)
-    jwt_secret: str = field(default=MISSING)
     algorithm: str = field(default="HS256")
 
 
@@ -55,14 +59,15 @@ class S3Settings:
 
 @dataclass
 class DynamoSettings:
-    table_name: str = field(default=MISSING)
+    table_suffix: str = field(default=SI("-${environment}"))
+    deletion_protection: bool = field(default=False)
 
 
 @dataclass
 class SiteSettings:
     homepage: str = field(default=MISSING)
     artifact_base_url: str = field(default=MISSING)
-    enable_test_endpoint: bool = field(default=False)
+    is_test_environment: bool = field(default=False)
 
 
 @dataclass
@@ -74,6 +79,7 @@ class CloudFrontSettings:
 
 @dataclass
 class EnvironmentSettings:
+    middleware: MiddlewareSettings = field(default_factory=MiddlewareSettings)
     oauth: OauthSettings = field(default_factory=OauthSettings)
     user: UserSettings = field(default_factory=UserSettings)
     crypto: CryptoSettings = field(default_factory=CryptoSettings)

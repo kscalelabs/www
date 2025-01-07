@@ -7,12 +7,16 @@ from typing import AsyncGenerator, Generator, cast
 import pytest
 from _pytest.python import Function
 from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import ASGITransport, AsyncClient
 from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
-from pytest_mock.plugin import MockerFixture, MockType
+from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
+# Populates environment variables.
 os.environ["ENVIRONMENT"] = "local"
+os.environ["MIDDLEWARE_SECRET_KEY"] = "test"
+os.environ["COGNITO_AUTHORITY"] = "test"
+os.environ["COGNITO_CLIENT_ID"] = "test"
 
 
 def pytest_collection_modifyitems(items: list[Function]) -> None:
@@ -69,7 +73,7 @@ def mock_aws() -> Generator[None, None, None]:
 
 @pytest.fixture()
 async def app_client() -> AsyncGenerator[AsyncClient, None]:
-    from www.app.main import app
+    from www.main import app
 
     transport = ASGITransport(cast(_ASGIApp, app))
 
@@ -79,16 +83,8 @@ async def app_client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture()
 def test_client() -> Generator[TestClient, None, None]:
-    import asyncio
 
-    from www.app.db import Crud, create_tables
-    from www.app.main import app
-
-    async def setup() -> None:
-        async with Crud() as crud:
-            await create_tables(crud)
-
-    asyncio.run(setup())
+    from www.main import app
 
     with TestClient(app) as client:
         yield client
@@ -96,34 +92,34 @@ def test_client() -> Generator[TestClient, None, None]:
 
 @pytest.fixture(autouse=True)
 def mock_send_email(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.utils.email.send_email")
+    mock = mocker.patch("www.utils.email.send_email")
     mock.return_value = None
     return mock
 
 
 @pytest.fixture(autouse=True)
-def mock_github_access_token(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_access_token_req")
-    mock.return_value = Response(status_code=200, json={"access_token": ""})
+def mock_get_user(mocker: MockerFixture) -> AsyncMockType:
+    mock = mocker.patch("www.auth._decode_user_from_token")
+
+    from www.auth import User
+
+    mock.return_value = User(
+        id="test_user",
+        is_admin=True,
+        can_upload=True,
+        can_test=True,
+    )
     return mock
 
 
 @pytest.fixture(autouse=True)
-def mock_github(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_req")
-    mock.return_value = Response(status_code=200, json={"html_url": "https://github.com/kscalelabs"})
-    return mock
+def mock_get_user_info(mocker: MockerFixture) -> AsyncMockType:
+    mock = mocker.patch("www.auth._decode_user_info_from_token")
 
+    from www.auth import UserInfo
 
-@pytest.fixture(autouse=True)
-def mock_github_email(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.github.github_email_req")
-    mock.return_value = Response(status_code=200, json=[{"email": "github-user@kscale.dev", "primary": True}])
-    return mock
-
-
-@pytest.fixture(autouse=True)
-def mock_google_user_data(mocker: MockerFixture) -> MockType:
-    mock = mocker.patch("www.app.routers.auth.google.get_google_user_data")
-    mock.return_value = {"email": "google-user@kscale.dev", "given_name": "Test", "family_name": "User"}
+    mock.return_value = UserInfo(
+        email="test@example.com",
+        email_verified=True,
+    )
     return mock

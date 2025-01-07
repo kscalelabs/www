@@ -1,10 +1,8 @@
-crypto:
-  jwt_secret: fakeJwtSecret
 s3:
   bucket: artifacts
   prefix: media/
 dynamo:
-  table_name: kscale-store-local
+  table_suffix: local
 cloudfront:
   domain: ${site.artifact_base_url}
   key_id: null
@@ -12,4 +10,4 @@ cloudfront:
 site:
   homepage: http://127.0.0.1:3000
   artifact_base_url: http://127.0.0.1:4566/artifacts/media/
-  enable_test_endpoint: true
+  is_test_environment: true
