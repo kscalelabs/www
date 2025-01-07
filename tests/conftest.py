@@ -54,9 +54,10 @@ def mock_aws() -> Generator[None, None, None]:
         server = ThreadedMotoServer(port=0)
         server.start()
         host, port = server.get_host_and_port()
-        os.environ["AWS_ENDPOINT_URL"] = f"http://{host}:{port}"
-        os.environ["AWS_ENDPOINT_URL_DYNAMODB"] = f"http://{host}:{port}"
-        os.environ["AWS_ENDPOINT_URL_S3"] = f"http://{host}:{port}"
+        endpoint = f"http://{host}:{port}"
+        os.environ["AWS_ENDPOINT_URL"] = endpoint
+        os.environ["AWS_ENDPOINT_URL_DYNAMODB"] = endpoint
+        os.environ["AWS_ENDPOINT_URL_S3"] = endpoint
 
         yield
 

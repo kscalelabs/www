@@ -51,5 +51,6 @@ jobs:
             MIDDLEWARE_SECRET_KEY=${{ secrets.MIDDLEWARE_SECRET_KEY }}
             COGNITO_AUTHORITY=${{ vars.COGNITO_AUTHORITY }}
             COGNITO_CLIENT_ID=${{ vars.COGNITO_CLIENT_ID }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}:latest
+          cache-to: type=inline
