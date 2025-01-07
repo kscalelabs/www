@@ -37,13 +37,17 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         env:
           ECR_REGISTRY: ${{ vars.ECR_REGISTRY_WWW }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_WWW }}
           ENVIRONMENT: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
-        run: |
-          docker build \
-            --build-arg ENVIRONMENT=${ENVIRONMENT} \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            -f docker/Dockerfile .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ vars.ECR_REGISTRY_WWW }}/${{ vars.ECR_REPOSITORY_WWW }}:latest
+          build-args: |
+            ENVIRONMENT=${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
