@@ -1,5 +1,5 @@
 version: 1.0
-runtime: python3
+runtime: python3.11
 build:
   commands:
     build:
@@ -8,7 +8,6 @@ build:
       # - pip install --upgrade pip
       - pip install .
 run:
-  runtime-version: 3.11.11
   command: fastapi run www/main.py --port 8080
   network:
     port: 8080
