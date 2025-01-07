@@ -3,10 +3,7 @@ runtime: python3
 build:
   commands:
     build:
-      # - apt-get update
-      # - apt-get install -y libglfw3 libglfw3-dev libgomp1
-      # - pip install --upgrade pip
-      - pip install -r www/requirements.txt
+      - pip install .
   env:
     - name: ENVIRONMENT
       value: staging
