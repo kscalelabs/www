@@ -50,5 +50,5 @@ jobs:
             MIDDLEWARE_SECRET_KEY=${{ secrets.MIDDLEWARE_SECRET_KEY }}
             COGNITO_AUTHORITY=${{ vars.COGNITO_AUTHORITY }}
             COGNITO_CLIENT_ID=${{ vars.COGNITO_CLIENT_ID }}
-          cache-from: type=registry,ref=${{ env.ECR_IMAGE }}:latest
-          cache-to: type=registry,ref=${{ env.ECR_IMAGE }}:latest,mode=max
+          cache-from: type=registry,ref=${{ env.ECR_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.ECR_IMAGE }}:cache,mode=max
