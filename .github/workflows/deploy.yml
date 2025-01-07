@@ -36,6 +36,10 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Create and use a new builder instance
+        run: |
+          docker buildx create --name www-builder --use
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         env:
@@ -45,9 +49,10 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ${{ env.ECR_IMAGE }}:latest
+          builder: www-builder
           build-args: |
             ENVIRONMENT=${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
             COGNITO_AUTHORITY=${{ vars.COGNITO_AUTHORITY }}
             COGNITO_CLIENT_ID=${{ vars.COGNITO_CLIENT_ID }}
-          cache-from: type=registry,ref=${{ env.ECR_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.ECR_IMAGE }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.ECR_IMAGE }}:cache
+          cache-to: type=registry,mode=max,image-manifest=true,oci-mediatypes=true,ref=${{ env.ECR_IMAGE }}:cache
