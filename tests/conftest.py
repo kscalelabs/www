@@ -14,6 +14,10 @@ from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
 os.environ["ENVIRONMENT"] = "local"
 
+# Populates other environment variables.
+os.environ["COGNITO_AUTHORITY"] = "test"
+os.environ["COGNITO_CLIENT_ID"] = "test"
+
 
 def pytest_collection_modifyitems(items: list[Function]) -> None:
     items.sort(key=lambda x: x.get_closest_marker("slow") is not None)
