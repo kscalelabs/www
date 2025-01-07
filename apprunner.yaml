@@ -6,7 +6,7 @@ build:
       # - apt-get update
       # - apt-get install -y libglfw3 libglfw3-dev libgomp1
       # - pip install --upgrade pip
-      - pip install .
+      - pip install -r www/requirements.txt
 run:
   command: fastapi run www/main.py --port 8080
   network:
