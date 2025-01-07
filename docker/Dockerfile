@@ -38,4 +38,4 @@ RUN pip install --no-cache-dir .
 EXPOSE 8080
 
 # Run the FastAPI application.
-CMD ["fastapi", "run", "www/app/main.py", "--port", "8080"]
+CMD ["fastapi", "run", "www/main.py", "--port", "8080"]
