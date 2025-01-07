@@ -45,5 +45,5 @@ async def test_profile_endpoint(test_client: TestClient) -> None:
 
 @pytest.mark.asyncio
 async def test_logout_endpoint(test_client: TestClient) -> None:
-    response = test_client.get("/auth/logout")
+    response = test_client.get("/auth/logout", headers={"Authorization": "Bearer test"})
     assert response.status_code == status.HTTP_200_OK, response.text
