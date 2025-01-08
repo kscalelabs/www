@@ -1,6 +1,5 @@
 """Pytest configuration file."""
 
-import asyncio
 import logging
 import os
 from typing import AsyncGenerator, Generator, cast
@@ -13,8 +12,7 @@ from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
 from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
-from www.crud.db import create_dbs
-from www.crud.s3 import create_s3_bucket
+from www.crud import create
 
 os.environ["ENVIRONMENT"] = "local"
 
@@ -24,7 +22,7 @@ def pytest_collection_modifyitems(items: list[Function]) -> None:
 
 
 @pytest.fixture(autouse=True)
-async def mock_aws() -> AsyncGenerator[None, None, None]:
+async def mock_aws() -> AsyncGenerator[None, None]:
     server: ThreadedMotoServer | None = None
 
     # logging.getLogger("botocore").setLevel(logging.DEBUG)
@@ -41,7 +39,7 @@ async def mock_aws() -> AsyncGenerator[None, None, None]:
         os.environ["AWS_ENDPOINT_URL_S3"] = endpoint
 
         # Create the S3 bucket and DynamoDB tables.
-        await asyncio.gather(create_s3_bucket(), create_dbs())
+        await create()
 
         yield
 
