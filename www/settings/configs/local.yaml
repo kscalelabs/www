@@ -1,13 +1,12 @@
-s3:
-  bucket: artifacts
-  prefix: media/
-dynamo:
-  table_suffix: local
-cloudfront:
-  domain: ${site.artifact_base_url}
-  key_id: null
-  private_key: null
+middleware:
+  secret_key: test
+aws:
+  s3:
+    bucket: artifacts
+    prefix: media/
+  dynamodb:
+    table_suffix: local
+  cloudfront:
+    domain: ${site.artifact_base_url}
 site:
-  homepage: http://127.0.0.1:3000
-  artifact_base_url: http://127.0.0.1:4566/artifacts/media/
   is_test_environment: true

@@ -8,10 +8,6 @@ start:
 	@if [ -f env.sh ]; then source env.sh; fi; fastapi dev 'www/main.py' --host localhost --port 8080
 .PHONY: start
 
-update-api:
-	@cd frontend && rm -rf src/gen/api.ts && openapi-typescript http://localhost:8080/openapi.json --output src/gen/api.ts
-.PHONY: update-api
-
 start-docker-dynamodb:
 	@docker kill www-db || true
 	@docker rm www-db || true
@@ -62,10 +58,6 @@ lint:
 #        Unit tests        #
 # ------------------------ #
 
-test-backend:
+test:
 	@python -m pytest
 .PHONY: test-backend
-
-# test: test-backend test-frontend
-test: test-backend
-.PHONY: test

@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 
 import aiosmtplib
 
-from www.settings import settings
+from www.settings import env
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 async def send_email(subject: str, body: str, to: str) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"{settings.email.sender_name} <{settings.email.sender_email}>"
+    msg["From"] = f"{env.email.sender_name} <{env.email.sender_email}>"
     msg["To"] = to
 
     msg.attach(MIMEText(body, "html"))
 
-    smtp_client = aiosmtplib.SMTP(hostname=settings.email.host, port=settings.email.port)
+    smtp_client = aiosmtplib.SMTP(hostname=env.email.host, port=env.email.port)
 
     await smtp_client.connect()
-    await smtp_client.login(settings.email.username, settings.email.password)
-    await smtp_client.sendmail(settings.email.sender_email, to, msg.as_string())
+    await smtp_client.login(env.email.username, env.email.password)
+    await smtp_client.sendmail(env.email.sender_email, to, msg.as_string())
     await smtp_client.quit()
 
 

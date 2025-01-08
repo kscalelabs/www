@@ -11,14 +11,6 @@ class MiddlewareSettings:
 
 
 @dataclass
-class OauthSettings:
-    cognito_authority: str = field(default=II("oc.env:COGNITO_AUTHORITY"))
-    cognito_client_id: str = field(default=II("oc.env:COGNITO_CLIENT_ID"))
-    jwks_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/jwks.json"))
-    server_metadata_url: str = field(default=SI("${oauth.cognito_authority}/.well-known/openid-configuration"))
-
-
-@dataclass
 class CryptoSettings:
     cache_token_db_result_seconds: int = field(default=30)
     expire_otp_minutes: int = field(default=10)
@@ -53,14 +45,28 @@ class ArtifactSettings:
 
 @dataclass
 class S3Settings:
-    bucket: str = field(default=II("oc.env:S3_BUCKET"))
-    prefix: str = field(default=II("oc.env:S3_PREFIX"))
+    bucket: str = field(default=SI("www-${environment}"))
+    prefix: str = field(default="media")
 
 
 @dataclass
 class DynamoSettings:
-    table_suffix: str = field(default=SI("-${environment}"))
+    table_suffix: str = field(default=SI("www-${environment}"))
     deletion_protection: bool = field(default=False)
+
+
+@dataclass
+class CloudFrontSettings:
+    domain: str = field(default=II("oc.env:CLOUDFRONT_DOMAIN"))
+    key_id: str = field(default=II("oc.env:CLOUDFRONT_KEY_ID"))
+    private_key: str = field(default=II("oc.env:CLOUDFRONT_PRIVATE_KEY"))
+
+
+@dataclass
+class AwsSettings:
+    s3: S3Settings = field(default_factory=S3Settings)
+    dynamodb: DynamoSettings = field(default_factory=DynamoSettings)
+    cloudfront: CloudFrontSettings = field(default_factory=CloudFrontSettings)
 
 
 @dataclass
@@ -71,23 +77,13 @@ class SiteSettings:
 
 
 @dataclass
-class CloudFrontSettings:
-    domain: str = field(default=II("oc.env:CLOUDFRONT_DOMAIN"))
-    key_id: str | None = field(default=II("oc.env:CLOUDFRONT_KEY_ID"))
-    private_key: str | None = field(default=II("oc.env:CLOUDFRONT_PRIVATE_KEY"))
-
-
-@dataclass
 class EnvironmentSettings:
     middleware: MiddlewareSettings = field(default_factory=MiddlewareSettings)
-    oauth: OauthSettings = field(default_factory=OauthSettings)
     user: UserSettings = field(default_factory=UserSettings)
     crypto: CryptoSettings = field(default_factory=CryptoSettings)
     email: EmailSettings = field(default_factory=EmailSettings)
     artifact: ArtifactSettings = field(default_factory=ArtifactSettings)
-    s3: S3Settings = field(default_factory=S3Settings)
-    dynamo: DynamoSettings = field(default_factory=DynamoSettings)
+    aws: AwsSettings = field(default_factory=AwsSettings)
     site: SiteSettings = field(default_factory=SiteSettings)
-    cloudfront: CloudFrontSettings = field(default_factory=CloudFrontSettings)
     debug: bool = field(default=False)
     environment: str = field(default="local")

@@ -5,12 +5,14 @@ The `CloudFrontUrlSigner` class allows you to create and sign CloudFront URLs wi
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Self
 
 from botocore.signers import CloudFrontSigner
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+
+from www.settings import env
 
 
 class CloudFrontUrlSigner:
@@ -80,3 +82,10 @@ class CloudFrontUrlSigner:
             policy["Statement"][0]["Condition"]["IpAddress"] = {"AWS:SourceIp": ip_range}
 
         return json.dumps(policy, separators=(",", ":"))
+
+    @classmethod
+    def get(cls) -> Self:
+        return cls(
+            key_id=env.aws.cloudfront.key_id,
+            private_key=env.aws.cloudfront.private_key,
+        )

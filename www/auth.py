@@ -10,16 +10,23 @@ from httpx import AsyncClient
 from jwt import PyJWKClient, decode as jwt_decode
 from pydantic.main import BaseModel
 
-from www.settings import settings
+from www.settings import env
 
 logger = logging.getLogger(__name__)
 
+# Points to the Cognito authority information page.
+COGNITO_AUTHORITY = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_dqtJl1Iew"
+COGNITO_CLIENT_ID = "5lu9h7nhtf6dvlunpodjr9qil5"
+
+SERVER_METADATA_URL = f"{COGNITO_AUTHORITY}/.well-known/openid-configuration"
+JWKS_URL = f"{COGNITO_AUTHORITY}/.well-known/jwks.json"
+
 oidc = OpenIdConnect(
-    openIdConnectUrl=settings.oauth.server_metadata_url,
+    openIdConnectUrl=SERVER_METADATA_URL,
     auto_error=False,
 )
 
-jwks = PyJWKClient(settings.oauth.jwks_url)
+jwks = PyJWKClient(JWKS_URL)
 
 
 class User(BaseModel):
@@ -66,7 +73,7 @@ def _decode_user_from_token(token: str) -> User:
             detail="Failed to validate token",
         ) from e
 
-    if settings.site.is_test_environment and not user.can_test:
+    if env.site.is_test_environment and not user.can_test:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User does not have test permissions",
@@ -136,7 +143,7 @@ class UserInfo(BaseModel):
 async def _decode_user_info_from_token(token: str) -> UserInfo:
     async with AsyncClient() as client:
         # Gets the metadata from the OpenID Connect server.
-        metadata_response = await client.get(settings.oauth.server_metadata_url)
+        metadata_response = await client.get(SERVER_METADATA_URL)
         metadata = metadata_response.json()
         if (userinfo_endpoint := metadata.get("userinfo_endpoint")) is None:
             raise HTTPException(

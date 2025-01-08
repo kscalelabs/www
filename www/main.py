@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from www.auth import COGNITO_CLIENT_ID
 from www.errors import (
     BadArtifactError,
     InternalError,
@@ -14,7 +15,7 @@ from www.errors import (
     NotAuthorizedError,
 )
 from www.routers.auth import router as auth_router
-from www.settings import settings
+from www.settings import env
 
 app = FastAPI(
     title="K-Scale",
@@ -23,7 +24,7 @@ app = FastAPI(
     swagger_ui_oauth2_redirect_url="/callback",
     swagger_ui_init_oauth={
         "appName": "www",
-        "clientId": settings.oauth.cognito_client_id,
+        "clientId": COGNITO_CLIENT_ID,
         "usePkceWithAuthorizationCodeGrant": True,
         "scopes": "openid email profile",
     },
@@ -41,7 +42,7 @@ app.add_middleware(
 # Add authentication middleware.
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.middleware.secret_key,
+    secret_key=env.middleware.secret_key,
     max_age=24 * 60 * 60,  # 1 day
 )
 

@@ -31,7 +31,7 @@ numpy-stl
 trimesh
 
 # Types
-types-aioboto3[dynamodb, s3]
+types-aioboto3[dynamodb,s3,cloudfront]
 
 # Converting files
 pybullet

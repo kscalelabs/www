@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from www.auth import User
 from www.errors import InternalError
-from www.settings import settings
+from www.settings import env
 from www.utils.db import new_uuid
 
 
@@ -75,8 +75,8 @@ DOWNLOAD_CONTENT_TYPE: dict[ArtifactType, str] = {
 }
 
 SizeMapping: dict[ArtifactSize, tuple[int, int]] = {
-    "large": settings.artifact.large_image_size,
-    "small": settings.artifact.small_image_size,
+    "large": env.artifact.large_image_size,
+    "small": env.artifact.small_image_size,
 }
 
 
@@ -313,7 +313,7 @@ def get_artifact_url(
         artifact_type=artifact_type,
         size=size,
     )
-    return f"{settings.site.artifact_base_url}{artifact_name}"
+    return f"{env.site.artifact_base_url}{artifact_name}"
 
 
 def get_artifact_urls(

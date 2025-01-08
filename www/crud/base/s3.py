@@ -15,7 +15,7 @@ from aiobotocore.response import StreamingBody
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.service_resource import S3ServiceResource
 
-from www.settings import settings
+from www.settings import env
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,8 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         """
         try:
             s3_object = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=f"{settings.s3.prefix}{filename}"
+                Bucket=env.aws.s3.bucket,
+                Key=f"{env.aws.s3.prefix}{filename}",
             )
             return s3_object.get("ContentLength")
         except ClientError as e:
@@ -68,54 +69,15 @@ class S3Crud(AsyncContextManager["S3Crud"]):
             logger.error("Unexpected error getting file size: %s", e)
             return None
 
-    async def generate_presigned_download_url(
-        self,
-        filename: str,
-        s3_key: str,
-        content_type: str,
-        checksum_algorithm: str = "SHA256",
-        expiration: int = 3600,
-    ) -> tuple[str, str | None]:
-        """Generate a presigned URL for downloading a file from S3 with checksum."""
-        try:
-            full_key = f"{settings.s3.prefix}{s3_key}"
-            head_response = await self.s3.meta.client.head_object(
-                Bucket=settings.s3.bucket, Key=full_key, ChecksumMode="ENABLED"
-            )
-            # Cast the response to str | None
-            checksum_value = head_response.get(f"Checksum{checksum_algorithm}")
-            checksum: str | None = str(checksum_value) if checksum_value is not None else None
-
-            url = await self.s3.meta.client.generate_presigned_url(
-                "get_object",
-                Params={
-                    "Bucket": settings.s3.bucket,
-                    "Key": full_key,
-                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
-                    "ResponseContentType": content_type,
-                    "ChecksumMode": "ENABLED",
-                },
-                ExpiresIn=expiration,
-            )
-            return str(url), checksum
-        except Exception as e:
-            logger.error(
-                "Error generating presigned download URL - Bucket: %s, Key: %s: %s",
-                settings.s3.bucket,
-                full_key,
-                str(e),
-            )
-            raise
-
     async def upload_to_s3(self, data: IO[bytes], name: str, filename: str, content_type: str) -> None:
         """Uploads some data to S3."""
         try:
-            bucket = await self.s3.Bucket(settings.s3.bucket)
+            bucket = await self.s3.Bucket(env.aws.s3.bucket)
 
             sanitized_name = name.replace("\u202f", " ").replace("\xa0", " ")
 
             await bucket.put_object(
-                Key=f"{settings.s3.prefix}{filename}",
+                Key=f"{env.aws.s3.prefix}{filename}",
                 Body=data,
                 ContentType=content_type,
                 ContentDisposition=f'attachment; filename="{sanitized_name}"',
@@ -134,8 +96,8 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         Returns:
             The object data.
         """
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        obj = await bucket.Object(f"{settings.s3.prefix}{filename}")
+        bucket = await self.s3.Bucket(env.aws.s3.bucket)
+        obj = await bucket.Object(f"{env.aws.s3.prefix}{filename}")
         data = await obj.get()
         return data["Body"]
 
@@ -145,8 +107,8 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         Args:
             filename: The filename of the object to delete.
         """
-        bucket = await self.s3.Bucket(settings.s3.bucket)
-        await bucket.delete_objects(Delete={"Objects": [{"Key": f"{settings.s3.prefix}{filename}"}]})
+        bucket = await self.s3.Bucket(env.aws.s3.bucket)
+        await bucket.delete_objects(Delete={"Objects": [{"Key": f"{env.aws.s3.prefix}{filename}"}]})
 
     async def generate_presigned_upload_url(
         self,
@@ -172,8 +134,8 @@ class S3Crud(AsyncContextManager["S3Crud"]):
             return await self.s3.meta.client.generate_presigned_url(
                 ClientMethod="put_object",
                 Params={
-                    "Bucket": settings.s3.bucket,
-                    "Key": f"{settings.s3.prefix}{s3_key}",
+                    "Bucket": env.aws.s3.bucket,
+                    "Key": f"{env.aws.s3.prefix}{s3_key}",
                     "ContentType": content_type,
                     "ContentDisposition": f'attachment; filename="{filename}"',
                     "ChecksumAlgorithm": checksum_algorithm,

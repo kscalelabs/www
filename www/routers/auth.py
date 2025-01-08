@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from pydantic.main import BaseModel
 
-from www.auth import User, UserInfo, require_user, require_user_info
+from www.auth import COGNITO_AUTHORITY, COGNITO_CLIENT_ID, User, UserInfo, require_user, require_user_info
 
 logger = logging.getLogger(__name__)
 
@@ -59,3 +59,16 @@ async def profile(
 async def logout(request: Request, user: Annotated[UserResponse, Depends(require_user)]) -> bool:
     request.session.clear()
     return True
+
+
+class OICDInfo(BaseModel):
+    authority: str
+    client_id: str
+
+
+@router.get("/oicd")
+async def oicd_info() -> OICDInfo:
+    return OICDInfo(
+        authority=COGNITO_AUTHORITY,
+        client_id=COGNITO_CLIENT_ID,
+    )

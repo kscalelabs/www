@@ -48,4 +48,4 @@ class _LazyLoadSettings(Generic[T]):
         return getattr(value, name)
 
 
-settings = cast(EnvironmentSettings, _LazyLoadSettings(_load_environment_settings))
+env = cast(EnvironmentSettings, _LazyLoadSettings(_load_environment_settings))

@@ -1,7 +1,7 @@
-dynamo:
-  table_suffix: prod
-  deletion_protection: true
+aws:
+  dynamodb:
+    deletion_protection: true
 site:
-  homepage: https://dashboard.kscale.dev
+  homepage: https://kscale.dev
   artifact_base_url: https://assets.kscale.dev/
   is_test_environment: false

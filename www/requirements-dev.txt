@@ -10,7 +10,7 @@ mypy
 ruff
 
 # Testing
-moto[dynamodb,s3]
+moto[dynamodb,s3,cloudfront]
 pytest
 pytest-asyncio
 pytest-mock

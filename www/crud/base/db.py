@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 
 from www.auth import User
-from www.settings import settings
+from www.settings import env
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
 
     @functools.cached_property
     def table_name(self) -> str:
-        return f"www-{self._get_table_name()}{settings.dynamo.table_suffix}"
+        return f"www-{self._get_table_name()}{env.aws.dynamodb.table_suffix}"
 
     @property
     async def table(self) -> Table:
