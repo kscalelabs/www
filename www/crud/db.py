@@ -17,7 +17,6 @@ import aioboto3
 from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 
-from www.auth import User
 from www.settings import env
 
 logger = logging.getLogger(__name__)
@@ -42,10 +41,6 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
     def _get_table_name(self) -> str:
         """Returns the name of the table."""
 
-    @abstractmethod
-    def delete_user_data(self, user: User) -> None:
-        """Deletes all data for a user."""
-
     @property
     def db(self) -> DynamoDBServiceResource:
         if self.__db is None:
@@ -54,7 +49,7 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
 
     @functools.cached_property
     def table_name(self) -> str:
-        return f"www-{self._get_table_name()}{env.aws.dynamodb.table_suffix}"
+        return f"{env.aws.dynamodb.table_prefix}-{self._get_table_name()}"
 
     @property
     async def table(self) -> Table:
@@ -96,3 +91,47 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
         table = await self.table
         response = await table.get_item(Key={"id": record_id})
         return response.get("Item")
+
+    async def create_table(self) -> None:
+        await self.db.create_table(
+            TableName=self.table_name,
+            AttributeDefinitions=[
+                {
+                    "AttributeName": "id",
+                    "AttributeType": "S",
+                },
+            ],
+            KeySchema=self.get_keys(),
+            ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
+        )
+
+
+class RobotsCrud(DBCrud):
+    """Defines the table holding information about classes of robots."""
+
+    def _get_table_name(self) -> str:
+        return "robots"
+
+
+class RobotCrud(DBCrud):
+    """Defines the table holding information about individual robots."""
+
+    def _get_table_name(self) -> str:
+        return "robot"
+
+
+robots_crud = RobotsCrud()
+robot_crud = RobotCrud()
+
+
+async def create_dbs() -> None:
+    async with robots_crud as crud:
+        await crud.create_table()
+
+    async with robot_crud as crud:
+        await crud.create_table()
+
+
+if __name__ == "__main__":
+    # python -m www.crud.db
+    asyncio.run(create_dbs())

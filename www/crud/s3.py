@@ -47,6 +47,9 @@ class S3Crud(AsyncContextManager["S3Crud"]):
             *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
         )
 
+    async def create_bucket(self) -> None:
+        await self.s3.create_bucket(Bucket=env.aws.s3.bucket)
+
     async def get_file_size(self, filename: str) -> int | None:
         """Gets the size of a file in S3.
 
@@ -152,3 +155,13 @@ class S3Crud(AsyncContextManager["S3Crud"]):
 
 
 s3_crud = S3Crud()
+
+
+async def create_s3_bucket() -> None:
+    async with s3_crud as crud:
+        await crud.create_bucket()
+
+
+if __name__ == "__main__":
+    # python -m www.crud.s3
+    asyncio.run(create_s3_bucket())
