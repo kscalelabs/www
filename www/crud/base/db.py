@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import itertools
 import logging
 from abc import ABC, abstractmethod
 from typing import (
@@ -14,6 +15,7 @@ from typing import (
 )
 
 import aioboto3
+from botocore.exceptions import ClientError
 from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 
@@ -93,45 +95,53 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
         return response.get("Item")
 
     async def create_table(self) -> None:
-        await self.db.create_table(
-            TableName=self.table_name,
-            AttributeDefinitions=[
-                {
-                    "AttributeName": "id",
-                    "AttributeType": "S",
-                },
-            ],
-            KeySchema=self.get_keys(),
-            ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
-        )
+        try:
+            await self.db.meta.client.describe_table(TableName=self.table_name)
+            logger.info("Found existing table %s", self.table_name)
+            return
 
+        except ClientError:
+            pass
 
-class RobotsCrud(DBCrud):
-    """Defines the table holding information about classes of robots."""
+        logger.info("Creating table %s", self.table_name)
+        gsis_set = self.get_gsis()
+        gsis: list[tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]] = [
+            (f"{g}_index", g, "S", "HASH") for g in gsis_set
+        ]
+        keys = self.get_keys()
 
-    def _get_table_name(self) -> str:
-        return "robots"
+        if gsis:
+            table = await self.db.create_table(
+                TableName=self.table_name,
+                AttributeDefinitions=[
+                    {"AttributeName": n, "AttributeType": t}
+                    for n, t in itertools.chain(((n, t) for (n, t, _) in keys), ((n, t) for _, n, t, _ in gsis))
+                ],
+                KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                GlobalSecondaryIndexes=(
+                    [
+                        {
+                            "IndexName": i,
+                            "KeySchema": [{"AttributeName": n, "KeyType": t}],
+                            "Projection": {"ProjectionType": "ALL"},
+                        }
+                        for i, n, _, t in gsis
+                    ]
+                ),
+                DeletionProtectionEnabled=env.aws.dynamodb.deletion_protection,
+                BillingMode="PAY_PER_REQUEST",
+            )
 
+        else:
+            table = await self.db.create_table(
+                AttributeDefinitions=[
+                    {"AttributeName": n, "AttributeType": t} for n, t in ((n, t) for (n, t, _) in keys)
+                ],
+                TableName=self.table_name,
+                KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                DeletionProtectionEnabled=env.aws.dynamodb.deletion_protection,
+                BillingMode="PAY_PER_REQUEST",
+            )
 
-class RobotCrud(DBCrud):
-    """Defines the table holding information about individual robots."""
-
-    def _get_table_name(self) -> str:
-        return "robot"
-
-
-robots_crud = RobotsCrud()
-robot_crud = RobotCrud()
-
-
-async def create_dbs() -> None:
-    async with robots_crud as crud:
-        await crud.create_table()
-
-    async with robot_crud as crud:
-        await crud.create_table()
-
-
-if __name__ == "__main__":
-    # python -m www.crud.db
-    asyncio.run(create_dbs())
+        # Wait for the table to be created.
+        await table.wait_until_exists()

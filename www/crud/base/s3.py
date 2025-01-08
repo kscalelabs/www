@@ -48,7 +48,30 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         )
 
     async def create_bucket(self) -> None:
+        try:
+            await self.s3.meta.client.head_bucket(Bucket=env.aws.s3.bucket)
+            logger.info("Found existing bucket %s", env.aws.s3.bucket)
+            return
+        except ClientError:
+            pass
+
+        logger.info("Creating bucket %s", env.aws.s3.bucket)
         await self.s3.create_bucket(Bucket=env.aws.s3.bucket)
+
+        logger.info("Updating %s CORS configuration", env.aws.s3.bucket)
+        s3_cors = await self.s3.BucketCors(env.aws.s3.bucket)
+        await s3_cors.put(
+            CORSConfiguration={
+                "CORSRules": [
+                    {
+                        "AllowedHeaders": ["*"],
+                        "AllowedMethods": ["GET"],
+                        "AllowedOrigins": ["*"],
+                        "ExposeHeaders": ["ETag"],
+                    }
+                ]
+            },
+        )
 
     async def get_file_size(self, filename: str) -> int | None:
         """Gets the size of a file in S3.

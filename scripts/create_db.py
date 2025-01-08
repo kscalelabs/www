@@ -14,7 +14,7 @@ import logging
 
 import colorlogging
 
-from www.crud.cloudfront import create_cloudfront_distribution
+from www.crud.db import create_dbs
 from www.crud.s3 import create_s3_bucket
 
 logger = logging.getLogger(__name__)
@@ -25,16 +25,16 @@ async def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--s3", action="store_true", help="Create the S3 bucket.")
-    parser.add_argument("--cf", action="store_true", help="Create the Cloudfront distribution.")
+    parser.add_argument("--db", action="store_true", help="Create the DynamoDB tables.")
     args = parser.parse_args()
 
     if args.s3:
         logger.info("Creating S3 bucket...")
         await create_s3_bucket()
 
-    if args.cf:
-        logger.info("Creating Cloudfront distribution...")
-        await create_cloudfront_distribution()
+    if args.db:
+        logger.info("Creating DynamoDB tables...")
+        await create_dbs()
 
 
 if __name__ == "__main__":
