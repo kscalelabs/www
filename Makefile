@@ -1,7 +1,7 @@
 # Makefile
 
 start:
-	@if [ -f env.sh ]; then source env.sh; fi; fastapi dev 'www/main.py' --host localhost --port 8080
+	ENVIRONMENT=local fastapi dev 'www/main.py' --host localhost --port 8080
 .PHONY: start
 
 start-localstack:

@@ -29,6 +29,12 @@ async def mock_aws() -> AsyncGenerator[None, None]:
     logging.getLogger("botocore").setLevel(logging.WARN)
 
     try:
+        # Sets required AWS environment variables.
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_SESSION_TOKEN"] = "test"
+        os.environ["AWS_DEFAULT_REGION"] = os.environ["AWS_REGION"] = "us-east-1"
+
         # Starts a local AWS server.
         server = ThreadedMotoServer(port=0)
         server.start()
