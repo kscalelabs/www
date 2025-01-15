@@ -86,4 +86,4 @@ class EnvironmentSettings:
     aws: AwsSettings = field(default_factory=AwsSettings)
     site: SiteSettings = field(default_factory=SiteSettings)
     debug: bool = field(default=False)
-    environment: str = field(default="local")
+    environment: str = field(default=MISSING)

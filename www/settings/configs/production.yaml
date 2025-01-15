@@ -1,3 +1,4 @@
+environment: production
 aws:
   dynamodb:
     deletion_protection: true

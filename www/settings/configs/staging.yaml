@@ -1,3 +1,4 @@
+environment: staging
 site:
   homepage: https://dashboard-staging.kscale.dev
   artifact_base_url: https://stagingassets.kscale.dev/
