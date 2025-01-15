@@ -102,9 +102,9 @@ class RobotClassCrud(DBCrud):
         Returns:
             The robot class that was updated.
         """
-        if not self._is_valid_name(new_class_name):
+        if new_class_name is not None and not self._is_valid_name(new_class_name):
             raise InvalidNameError(f"Invalid robot class name: {new_class_name}")
-        if not self._is_valid_description(new_description):
+        if new_description is not None and not self._is_valid_description(new_description):
             raise InvalidNameError("Invalid robot class description")
 
         table = await self.table

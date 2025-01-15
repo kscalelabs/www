@@ -42,12 +42,6 @@ class VersionNumber:
     def __ge__(self, other: "VersionNumber") -> bool:
         return (self.major, self.minor, self.patch) >= (other.major, other.minor, other.patch)
 
-    def __eq__(self, other: "VersionNumber") -> bool:
-        return (self.major, self.minor, self.patch) == (other.major, other.minor, other.patch)
-
-    def __ne__(self, other: "VersionNumber") -> bool:
-        return (self.major, self.minor, self.patch) != (other.major, other.minor, other.patch)
-
     def __repr__(self) -> str:
         return f"VersionNumber(major={self.major}, minor={self.minor}, patch={self.patch})"
 

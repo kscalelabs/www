@@ -56,8 +56,8 @@ async def add_robot_class(
 
 @router.put("/update")
 async def update_robot_class(
-    class_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
+    existing_robot_class: RobotClass = Depends(get_robot_class_by_name),
     crud: RobotClassCrud = Depends(robot_class_crud),
     new_class_name: str | None = Query(
         default=None,
@@ -69,10 +69,6 @@ async def update_robot_class(
     ),
 ) -> RobotClass:
     """Updates a robot class."""
-    # Get the existing robot class by name.
-    existing_robot_class = await crud.get_robot_class_by_name(class_name)
-    if existing_robot_class is None:
-        raise ItemNotFoundError(class_name)
     if existing_robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
 
@@ -85,14 +81,11 @@ async def update_robot_class(
 
 @router.delete("/delete")
 async def delete_robot_class(
-    class_name: str,
     user: Annotated[User, Depends(require_user)],
+    robot_class: RobotClass = Depends(get_robot_class_by_name),
     crud: RobotClassCrud = Depends(robot_class_crud),
 ) -> bool:
     """Deletes a robot class."""
-    robot_class = await crud.get_robot_class_by_name(class_name)
-    if robot_class is None:
-        raise ItemNotFoundError(f"Robot class '{class_name}' not found")
     if robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     await crud.delete_robot_class(robot_class)

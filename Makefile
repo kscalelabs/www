@@ -1,14 +1,26 @@
 # Makefile
 
+ENV_VARS = \
+	ENVIRONMENT=local \
+	AWS_REGION=us-east-1 \
+	AWS_DEFAULT_REGION=us-east-1 \
+	AWS_ACCESS_KEY_ID=test \
+	AWS_SECRET_ACCESS_KEY=test \
+	AWS_ENDPOINT_URL=http://localhost:4566
+
 start:
-	ENVIRONMENT=local fastapi dev 'www/main.py' --host localhost --port 8080
+	$(ENV_VARS) fastapi dev 'www/main.py' --host localhost --port 8080
 .PHONY: start
 
 start-localstack:
-	@docker kill www-localstack || true
-	@docker rm www-localstack || true
-	@docker run -d --name www-localstack -p 4566:4566 -p 4571:4571 localstack/localstack
-.PHONY: start-docker-localstack
+	@docker compose --file docker/docker-compose-localstack.yml down --remove-orphans
+	@docker rm -f www-localstack 2>/dev/null || true
+	@docker compose --file docker/docker-compose-localstack.yml up -d localstack --force-recreate
+.PHONY: start-localstack
+
+create-db:
+	$(ENV_VARS) python -m scripts.create_db --s3 --db
+.PHONY: create-db
 
 format:
 	@black www tests

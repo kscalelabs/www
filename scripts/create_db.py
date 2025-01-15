@@ -14,10 +14,14 @@ import logging
 
 import colorlogging
 
-from www.crud.db import create_dbs
-from www.crud.s3 import create_s3_bucket
+from www.crud.base.db import DBCrud
+from www.crud.base.s3 import create_s3_bucket
+from www.crud.robot import robot_crud
+from www.crud.robot_class import robot_class_crud
 
 logger = logging.getLogger(__name__)
+
+CRUDS: list[DBCrud] = [robot_class_crud, robot_crud]
 
 
 async def main() -> None:
@@ -33,8 +37,10 @@ async def main() -> None:
         await create_s3_bucket()
 
     if args.db:
-        logger.info("Creating DynamoDB tables...")
-        await create_dbs()
+        for crud in CRUDS:
+            async with crud:
+                logger.info("Creating %s table...", crud.table_name)
+                await crud.create_table()
 
 
 if __name__ == "__main__":
