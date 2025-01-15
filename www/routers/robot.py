@@ -48,6 +48,8 @@ async def _get_robot_and_class_by_id(
     if robot is None:
         raise ItemNotFoundError(f"Robot '{id}' not found")
     robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
+    if robot_class is None:
+        raise ItemNotFoundError(f"Robot class '{robot.class_id}' not found")
     return robot, robot_class
 
 
@@ -60,6 +62,8 @@ async def _get_base_robot_by_name(
     if robot is None:
         raise ItemNotFoundError(f"Robot '{robot_name}' not found")
     robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
+    if robot_class is None:
+        raise ItemNotFoundError(f"Robot class '{robot.class_id}' not found")
     return RobotResponse.from_robot(robot, robot_class)
 
 
@@ -72,6 +76,8 @@ async def _get_robot_and_class_by_name(
     if robot is None:
         raise ItemNotFoundError(f"Robot '{robot_name}' not found")
     robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
+    if robot_class is None:
+        raise ItemNotFoundError(f"Robot class '{robot.class_id}' not found")
     return robot, robot_class
 
 

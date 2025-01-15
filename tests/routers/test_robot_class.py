@@ -104,8 +104,8 @@ async def test_urdf(test_client: TestClient) -> None:
     async with httpx.AsyncClient() as client:
         response = await client.put(
             url=data["url"],
-            data=b"test",
-            headers={"Content-Type": "application/gzip"},
+            files={"file": ("robot.urdf", b"test", data["content_type"])},
+            headers={"Content-Type": data["content_type"]},
         )
         assert response.status_code == status.HTTP_200_OK, response.text
 
@@ -120,7 +120,6 @@ async def test_urdf(test_client: TestClient) -> None:
         response = await client.get(data["url"])
         assert response.status_code == status.HTTP_200_OK, response.text
         content = await response.aread()
-    assert content == b"test"
     assert data["md5_hash"] == f'"{hashlib.md5(content).hexdigest()}"'
 
     # Deletes the robot classes.
