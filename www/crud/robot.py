@@ -75,7 +75,7 @@ class RobotCrud(DBCrud):
         )
 
         # Check if the robot already exists.
-        existing_robot = await self.get_robot_by_name(robot_name)
+        existing_robot = await self.get_robot_by_name(robot_name, user_id)
         if existing_robot is not None:
             raise ValueError(f"Robot with name '{robot_name}' already exists")
 
@@ -93,6 +93,7 @@ class RobotCrud(DBCrud):
     async def update_robot(
         self,
         robot: Robot,
+        user_id: str,
         new_robot_name: str | None = None,
         new_description: str | None = None,
     ) -> Robot:
@@ -100,6 +101,7 @@ class RobotCrud(DBCrud):
 
         Args:
             robot: The robot to update.
+            user_id: The ID of the user who owns the robot.
             new_robot_name: The new name of the robot.
             new_description: The new description of the robot.
 
@@ -117,7 +119,7 @@ class RobotCrud(DBCrud):
         old_robot_name = robot.robot_name
         if new_robot_name is not None:
             if old_robot_name != new_robot_name:
-                if (await self.get_robot_by_name(new_robot_name)) is not None:
+                if (await self.get_robot_by_name(new_robot_name, user_id)) is not None:
                     raise ValueError(f"Robot with name '{new_robot_name}' already exists")
             robot.robot_name = new_robot_name
 
@@ -145,12 +147,12 @@ class RobotCrud(DBCrud):
         table = await self.table
         await table.delete_item(Key={"id": robot.id})
 
-    async def get_robot_by_name(self, robot_name: str) -> Robot | None:
+    async def get_robot_by_name(self, robot_name: str, user_id: str) -> Robot | None:
         """Gets a robot by name."""
         table = await self.table
         response = await table.query(
             IndexName=self.get_gsi_index_name("robot_name"),
-            KeyConditionExpression=Key("robot_name").eq(robot_name),
+            KeyConditionExpression=Key("robot_name").eq(robot_name) & Key("user_id").eq(user_id),
         )
         if (items := response.get("Items", [])) == []:
             return None
@@ -158,13 +160,19 @@ class RobotCrud(DBCrud):
             raise ValueError(f"Multiple robots with name '{robot_name}' found")
         return Robot.model_validate(items[0])
 
-    async def get_robot_by_id(self, id: str) -> Robot | None:
+    async def get_robot_by_id(self, id: str, user_id: str) -> Robot | None:
         """Gets a robot by ID."""
         table = await self.table
-        response = await table.get_item(Key={"id": id})
-        if (item := response.get("Item")) is None:
+        response = await table.query(
+            IndexName=self.get_gsi_index_name("user_id"),
+            KeyConditionExpression=Key("user_id").eq(user_id),
+            FilterExpression=Key("id").eq(id),
+        )
+        if (items := response.get("Items", [])) == []:
             return None
-        return Robot.model_validate(item)
+        if len(items) > 1:
+            raise ValueError(f"Multiple robots with ID '{id}' found")
+        return Robot.model_validate(items[0])
 
     async def list_robots(self, user_id: str | None = None) -> list[Robot]:
         """Gets all robots."""
