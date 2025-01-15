@@ -102,7 +102,6 @@ async def get_robots_for_user(
     user_id: str,
     user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
-    cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> list[Robot]:
     if user_id.lower() == "me":
         return await crud.list_robots(user.id)
