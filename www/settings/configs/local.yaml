@@ -1,3 +1,4 @@
+environment: local
 middleware:
   secret_key: test
 aws:

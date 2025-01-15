@@ -22,6 +22,14 @@ create-db:
 	$(ENV_VARS) python -m scripts.create_db --s3 --db
 .PHONY: create-db
 
+create-staging-db:
+	ENVIRONMENT=staging python -m scripts.create_db --s3 --db
+.PHONY: create-staging-db
+
+create-production-db:
+	ENVIRONMENT=production python -m scripts.create_db --s3 --db
+.PHONY: create-production-db
+
 format:
 	@black www tests
 	@ruff check --fix www tests
