@@ -152,7 +152,8 @@ class RobotCrud(DBCrud):
         table = await self.table
         response = await table.query(
             IndexName=self.get_gsi_index_name("robot_name"),
-            KeyConditionExpression=Key("robot_name").eq(robot_name) & Key("user_id").eq(user_id),
+            KeyConditionExpression=Key("robot_name").eq(robot_name),
+            FilterExpression=Key("user_id").eq(user_id),
         )
         if (items := response.get("Items", [])) == []:
             return None
@@ -163,16 +164,13 @@ class RobotCrud(DBCrud):
     async def get_robot_by_id(self, id: str, user_id: str) -> Robot | None:
         """Gets a robot by ID."""
         table = await self.table
-        response = await table.query(
-            IndexName=self.get_gsi_index_name("user_id"),
-            KeyConditionExpression=Key("user_id").eq(user_id),
-            FilterExpression=Key("id").eq(id),
-        )
-        if (items := response.get("Items", [])) == []:
+        response = await table.get_item(Key={"id": id})
+        if (item := response.get("Item")) is None:
             return None
-        if len(items) > 1:
-            raise ValueError(f"Multiple robots with ID '{id}' found")
-        return Robot.model_validate(items[0])
+        robot = Robot.model_validate(item)
+        if robot.user_id != user_id:
+            return None
+        return robot
 
     async def list_robots(self, user_id: str | None = None) -> list[Robot]:
         """Gets all robots."""
