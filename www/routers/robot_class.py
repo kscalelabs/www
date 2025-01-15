@@ -60,9 +60,13 @@ async def add_robot_class(
     class_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
+    description: str | None = Query(
+        default=None,
+        description="The description of the robot class",
+    ),
 ) -> RobotClass:
     """Adds a robot class."""
-    return await crud.add_robot_class(class_name, user.id)
+    return await crud.add_robot_class(class_name, user.id, description)
 
 
 @router.post("/{class_name}")

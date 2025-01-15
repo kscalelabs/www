@@ -115,8 +115,12 @@ async def add_robot(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
+    description: str | None = Query(
+        default=None,
+        description="The description of the robot",
+    ),
 ) -> RobotResponse:
-    robot = await crud.add_robot(robot_name, user.id, robot_class.id)
+    robot = await crud.add_robot(robot_name, user.id, robot_class.id, description)
     return RobotResponse.from_robot(robot, robot_class)
 
 
