@@ -41,10 +41,11 @@ async def get_robots(
 
 async def _get_robot_and_class_by_id(
     id: str,
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
     cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> tuple[Robot, RobotClass]:
-    robot = await crud.get_robot_by_id(id)
+    robot = await crud.get_robot_by_id(id, user.id)
     if robot is None:
         raise ItemNotFoundError(f"Robot '{id}' not found")
     robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
@@ -55,9 +56,10 @@ async def _get_robot_and_class_by_id(
 
 async def _get_base_robot_by_name(
     robot_name: str,
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
 ) -> Robot:
-    robot = await crud.get_robot_by_name(robot_name)
+    robot = await crud.get_robot_by_name(robot_name, user.id)
     if robot is None:
         raise ItemNotFoundError(f"Robot '{robot_name}' not found")
     return robot
@@ -65,10 +67,11 @@ async def _get_base_robot_by_name(
 
 async def _get_robot_and_class_by_name(
     robot_name: str,
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
     cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> tuple[Robot, RobotClass]:
-    robot = await crud.get_robot_by_name(robot_name)
+    robot = await crud.get_robot_by_name(robot_name, user.id)
     if robot is None:
         raise ItemNotFoundError(f"Robot '{robot_name}' not found")
     robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
@@ -80,20 +83,22 @@ async def _get_robot_and_class_by_name(
 @router.get("/name/{robot_name}")
 async def get_robot_by_name(
     robot_name: str,
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
     cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> RobotResponse:
-    robot, robot_class = await _get_robot_and_class_by_name(robot_name, crud, cls_crud)
+    robot, robot_class = await _get_robot_and_class_by_name(robot_name, user, crud, cls_crud)
     return RobotResponse.from_robot(robot, robot_class)
 
 
 @router.get("/id/{id}")
 async def get_robot_by_id(
     id: str,
+    user: Annotated[User, Depends(require_user)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
     cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> RobotResponse:
-    robot, robot_class = await _get_robot_and_class_by_id(id, crud, cls_crud)
+    robot, robot_class = await _get_robot_and_class_by_id(id, user, crud, cls_crud)
     return RobotResponse.from_robot(robot, robot_class)
 
 
@@ -109,18 +114,22 @@ async def get_robots_for_user(
         return await crud.list_robots(user_id)
 
 
-@router.put("/add")
+@router.put("/{robot_name}")
 async def add_robot(
     robot_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
+    description: str | None = Query(
+        default=None,
+        description="The description of the robot",
+    ),
 ) -> RobotResponse:
-    robot = await crud.add_robot(robot_name, user.id, robot_class.id)
+    robot = await crud.add_robot(robot_name, user.id, robot_class.id, description)
     return RobotResponse.from_robot(robot, robot_class)
 
 
-@router.put("/update")
+@router.post("/{robot_name}")
 async def update_robot(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     existing_robot_tuple: Annotated[tuple[Robot, RobotClass], Depends(_get_robot_and_class_by_name)],
@@ -137,11 +146,11 @@ async def update_robot(
     existing_robot, existing_robot_class = existing_robot_tuple
     if existing_robot.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot")
-    robot = await crud.update_robot(existing_robot, new_robot_name, new_description)
+    robot = await crud.update_robot(existing_robot, user.id, new_robot_name, new_description)
     return RobotResponse.from_robot(robot, existing_robot_class)
 
 
-@router.delete("/delete")
+@router.delete("/{robot_name}")
 async def delete_robot(
     user: Annotated[User, Depends(require_user)],
     robot: Annotated[Robot, Depends(_get_base_robot_by_name)],

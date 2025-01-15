@@ -10,14 +10,16 @@ HEADERS = {"Authorization": "Bearer test"}
 @pytest.mark.asyncio
 async def test_robots(test_client: TestClient) -> None:
     # First create a robot class that we'll use
-    response = test_client.put("/robots/add", params={"class_name": "test_class"}, headers=HEADERS)
+    response = test_client.put("/robots/test_class", params={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
     robot_class_data = response.json()
     assert robot_class_data["id"] is not None
 
     # Adds a robot
     response = test_client.put(
-        "/robot/add", params={"robot_name": "test_robot", "class_name": "test_class"}, headers=HEADERS
+        "/robot/test_robot",
+        params={"description": "Test description", "class_name": "test_class"},
+        headers=HEADERS,
     )
     assert response.status_code == status.HTTP_200_OK, response.text
     data = response.json()
@@ -28,7 +30,9 @@ async def test_robots(test_client: TestClient) -> None:
 
     # Attempts to add a second robot with the same name
     response = test_client.put(
-        "/robot/add", params={"robot_name": "test_robot", "class_name": "test_class"}, headers=HEADERS
+        "/robot/test_robot",
+        params={"description": "Test description", "class_name": "test_class"},
+        headers=HEADERS,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST, response.text
 
@@ -53,15 +57,16 @@ async def test_robots(test_client: TestClient) -> None:
 
     # Adds a second robot
     response = test_client.put(
-        "/robot/add", params={"robot_name": "other_robot", "class_name": "test_class"}, headers=HEADERS
+        "/robot/other_robot",
+        params={"description": "Test description", "class_name": "test_class"},
+        headers=HEADERS,
     )
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Updates the first robot
-    response = test_client.put(
-        "/robot/update",
+    response = test_client.post(
+        "/robot/test_robot",
         params={
-            "robot_name": "test_robot",
             "new_robot_name": "updated_robot",
             "new_description": "new description",
         },
@@ -80,7 +85,7 @@ async def test_robots(test_client: TestClient) -> None:
     assert all(robot["robot_name"] in ("updated_robot", "other_robot") for robot in data)
 
     # Deletes the robots
-    response = test_client.delete("/robot/delete", params={"robot_name": "updated_robot"}, headers=HEADERS)
+    response = test_client.delete("/robot/updated_robot", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Lists my robots again
@@ -96,8 +101,8 @@ async def test_robots(test_client: TestClient) -> None:
     data = response.json()
     assert data["id"] is not None
 
-    response = test_client.delete("/robot/delete", params={"robot_name": "other_robot"}, headers=HEADERS)
+    response = test_client.delete("/robot/other_robot", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
-    response = test_client.delete("/robots/delete", params={"class_name": "test_class"}, headers=HEADERS)
+    response = test_client.delete("/robots/test_class", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text

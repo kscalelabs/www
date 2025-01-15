@@ -15,7 +15,11 @@ router = APIRouter()
 
 
 def urdf_s3_key(robot_class: RobotClass) -> str:
-    return f"urdfs/{robot_class.id}/robot.urdf"
+    return f"urdfs/{robot_class.id}/robot.tgz"
+
+
+def kernel_image_s3_key(robot_class: RobotClass) -> str:
+    return f"kernel_images/{robot_class.id}/kernel.png"
 
 
 @router.get("/")
@@ -51,17 +55,21 @@ async def get_robot_classes_for_user(
         return await crud.list_robot_classes(user_id)
 
 
-@router.put("/add")
+@router.put("/{class_name}")
 async def add_robot_class(
     class_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
+    description: str | None = Query(
+        default=None,
+        description="The description of the robot class",
+    ),
 ) -> RobotClass:
     """Adds a robot class."""
-    return await crud.add_robot_class(class_name, user.id)
+    return await crud.add_robot_class(class_name, user.id, description)
 
 
-@router.put("/update")
+@router.post("/{class_name}")
 async def update_robot_class(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     existing_robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
@@ -86,18 +94,19 @@ async def update_robot_class(
     )
 
 
-@router.delete("/delete")
+@router.delete("/{class_name}")
 async def delete_robot_class(
-    user: Annotated[User, Depends(require_user)],
+    user: Annotated[User, Depends(require_permissions({"upload"}))],
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
-    crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
+    db_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
+    fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> bool:
     """Deletes a robot class."""
     if robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     s3_key = urdf_s3_key(robot_class)
-    await s3_crud.delete_from_s3(s3_key)
-    await crud.delete_robot_class(robot_class)
+    await fs_crud.delete_from_s3(s3_key)
+    await db_crud.delete_robot_class(robot_class)
     return True
 
 
@@ -112,12 +121,12 @@ class RobotDownloadURDFResponse(BaseModel):
 @urdf_router.get("/{class_name}")
 async def get_urdf_for_robot(
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
-    s3_crud: Annotated[S3Crud, Depends(s3_crud)],
+    fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> RobotDownloadURDFResponse:
     s3_key = urdf_s3_key(robot_class)
     url, md5_hash = await asyncio.gather(
-        s3_crud.generate_presigned_download_url(s3_key),
-        s3_crud.get_file_hash(s3_key),
+        fs_crud.generate_presigned_download_url(s3_key),
+        fs_crud.get_file_hash(s3_key),
     )
     return RobotDownloadURDFResponse(url=url, md5_hash=md5_hash)
 
@@ -133,33 +142,26 @@ async def upload_urdf_for_robot(
     filename: str,
     content_type: str,
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
-    s3_crud: Annotated[S3Crud, Depends(s3_crud)],
+    fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> RobotUploadURDFResponse:
-    # Checks that the content type is valid.
-    if content_type not in {
-        "application/octet-stream",
-        "application/xml",
-        "application/gzip",
-        "application/x-gzip",
-        "application/x-tar",
-        "application/x-compressed-tar",
-        "application/zip",
-    }:
+    # Checks that the content type is .tgz file.
+    if content_type != "application/x-compressed-tar":
         raise ValueError(f"Invalid content type: {content_type}")
-
+    if not filename.lower().endswith(".tgz"):
+        raise ValueError(f"Invalid filename: {filename}")
     s3_key = urdf_s3_key(robot_class)
-    url = await s3_crud.generate_presigned_upload_url(filename, s3_key, content_type)
+    url = await fs_crud.generate_presigned_upload_url(filename, s3_key, content_type)
     return RobotUploadURDFResponse(url=url, filename=filename, content_type=content_type)
 
 
 @urdf_router.delete("/{class_name}")
 async def delete_urdf_for_robot(
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
-    s3_crud: Annotated[S3Crud, Depends(s3_crud)],
+    fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> bool:
     s3_key = urdf_s3_key(robot_class)
-    await s3_crud.delete_from_s3(s3_key)
+    await fs_crud.delete_from_s3(s3_key)
     return True
 
 
-router.include_router(urdf_router, prefix="/urdf")
+router.include_router(urdf_router, prefix="/urdf", dependencies=[Depends(require_permissions({"upload"}))])
