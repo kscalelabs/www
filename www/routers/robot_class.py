@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 def urdf_s3_key(robot_class: RobotClass) -> str:
-    return f"urdfs/{robot_class.id}/robot.urdf"
+    return f"urdfs/{robot_class.id}/robot.tgz"
 
 
 def kernel_image_s3_key(robot_class: RobotClass) -> str:
@@ -144,18 +144,11 @@ async def upload_urdf_for_robot(
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> RobotUploadURDFResponse:
-    # Checks that the content type is valid.
-    if content_type not in {
-        "application/octet-stream",
-        "application/xml",
-        "application/gzip",
-        "application/x-gzip",
-        "application/x-tar",
-        "application/x-compressed-tar",
-        "application/zip",
-    }:
+    # Checks that the content type is .tgz file.
+    if content_type != "application/x-compressed-tar":
         raise ValueError(f"Invalid content type: {content_type}")
-
+    if not filename.lower().endswith(".tgz"):
+        raise ValueError(f"Invalid filename: {filename}")
     s3_key = urdf_s3_key(robot_class)
     url = await fs_crud.generate_presigned_upload_url(filename, s3_key, content_type)
     return RobotUploadURDFResponse(url=url, filename=filename, content_type=content_type)

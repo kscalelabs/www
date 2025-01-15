@@ -89,8 +89,8 @@ async def test_urdf(test_client: TestClient) -> None:
     response = test_client.put(
         "/robots/urdf/test",
         params={
-            "filename": "robot.urdf",
-            "content_type": "application/gzip",
+            "filename": "robot_files.tgz",
+            "content_type": "application/x-compressed-tar",
         },
         headers=HEADERS,
     )
@@ -102,7 +102,7 @@ async def test_urdf(test_client: TestClient) -> None:
     async with httpx.AsyncClient() as client:
         response = await client.put(
             url=data["url"],
-            files={"file": ("robot.urdf", b"test", data["content_type"])},
+            files={"file": ("robot_files.tgz", b"test", data["content_type"])},
             headers={"Content-Type": data["content_type"]},
         )
         assert response.status_code == status.HTTP_200_OK, response.text
