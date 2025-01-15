@@ -56,15 +56,11 @@ async def _get_robot_and_class_by_id(
 async def _get_base_robot_by_name(
     robot_name: str,
     crud: Annotated[RobotCrud, Depends(robot_crud)],
-    cls_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
 ) -> Robot:
     robot = await crud.get_robot_by_name(robot_name)
     if robot is None:
         raise ItemNotFoundError(f"Robot '{robot_name}' not found")
-    robot_class = await cls_crud.get_robot_class_by_id(robot.class_id)
-    if robot_class is None:
-        raise ItemNotFoundError(f"Robot class '{robot.class_id}' not found")
-    return RobotResponse.from_robot(robot, robot_class)
+    return robot
 
 
 async def _get_robot_and_class_by_name(
