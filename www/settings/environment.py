@@ -44,15 +44,15 @@ class ArtifactSettings:
 
 
 @dataclass
-class S3Settings:
-    bucket: str = field(default=SI("www-${environment}"))
-    prefix: str = field(default="media")
+class DynamoSettings:
+    table_prefix: str = field(default=SI("www-${environment}"))
+    deletion_protection: bool = field(default=False)
 
 
 @dataclass
-class DynamoSettings:
-    table_suffix: str = field(default=SI("www-${environment}"))
-    deletion_protection: bool = field(default=False)
+class S3Settings:
+    bucket: str = field(default=SI("kscale-www-${environment}"))
+    prefix: str = field(default="")
 
 
 @dataclass
@@ -64,8 +64,8 @@ class CloudFrontSettings:
 
 @dataclass
 class AwsSettings:
-    s3: S3Settings = field(default_factory=S3Settings)
     dynamodb: DynamoSettings = field(default_factory=DynamoSettings)
+    s3: S3Settings = field(default_factory=S3Settings)
     cloudfront: CloudFrontSettings = field(default_factory=CloudFrontSettings)
 
 

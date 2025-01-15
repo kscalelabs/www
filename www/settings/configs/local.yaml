@@ -4,8 +4,6 @@ aws:
   s3:
     bucket: artifacts
     prefix: media/
-  dynamodb:
-    table_suffix: local
   cloudfront:
     domain: ${site.artifact_base_url}
 site:

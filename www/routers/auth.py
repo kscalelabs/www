@@ -56,7 +56,7 @@ async def profile(
 
 
 @router.get("/logout")
-async def logout(request: Request, user: Annotated[UserResponse, Depends(require_user)]) -> bool:
+async def logout(request: Request, user: Annotated[User, Depends(require_user)]) -> bool:
     request.session.clear()
     return True
 

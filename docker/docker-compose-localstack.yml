@@ -1,0 +1,9 @@
+services:
+  localstack:
+    image: localstack/localstack
+    container_name: www-localstack
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    restart: always
+    pull_policy: always

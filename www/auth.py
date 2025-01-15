@@ -69,13 +69,13 @@ def _decode_user_from_token(token: str) -> User:
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,  # Return 401 to indicate that the token is invalid
             detail="Failed to validate token",
         ) from e
 
     if env.site.is_test_environment and not user.can_test:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_403_FORBIDDEN,  # Return 403 to indicate that the user does not have permissions
             detail="User does not have test permissions",
         )
 

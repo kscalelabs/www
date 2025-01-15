@@ -12,6 +12,8 @@ from httpx._transports.asgi import _ASGIApp
 from moto.server import ThreadedMotoServer
 from pytest_mock.plugin import AsyncMockType, MockerFixture, MockType
 
+from www.crud import create
+
 os.environ["ENVIRONMENT"] = "local"
 
 
@@ -20,13 +22,19 @@ def pytest_collection_modifyitems(items: list[Function]) -> None:
 
 
 @pytest.fixture(autouse=True)
-def mock_aws() -> Generator[None, None, None]:
+async def mock_aws() -> AsyncGenerator[None, None]:
     server: ThreadedMotoServer | None = None
 
     # logging.getLogger("botocore").setLevel(logging.DEBUG)
     logging.getLogger("botocore").setLevel(logging.WARN)
 
     try:
+        # Sets required AWS environment variables.
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_SESSION_TOKEN"] = "test"
+        os.environ["AWS_DEFAULT_REGION"] = os.environ["AWS_REGION"] = "us-east-1"
+
         # Starts a local AWS server.
         server = ThreadedMotoServer(port=0)
         server.start()
@@ -35,6 +43,9 @@ def mock_aws() -> Generator[None, None, None]:
         os.environ["AWS_ENDPOINT_URL"] = endpoint
         os.environ["AWS_ENDPOINT_URL_DYNAMODB"] = endpoint
         os.environ["AWS_ENDPOINT_URL_S3"] = endpoint
+
+        # Create the S3 bucket and DynamoDB tables.
+        await create()
 
         yield
 

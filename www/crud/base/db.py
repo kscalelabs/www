@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import itertools
 import logging
 from abc import ABC, abstractmethod
 from typing import (
@@ -14,10 +15,10 @@ from typing import (
 )
 
 import aioboto3
+from botocore.exceptions import ClientError
 from pydantic import BaseModel
 from types_aiobotocore_dynamodb.service_resource import DynamoDBServiceResource, Table
 
-from www.auth import User
 from www.settings import env
 
 logger = logging.getLogger(__name__)
@@ -42,10 +43,6 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
     def _get_table_name(self) -> str:
         """Returns the name of the table."""
 
-    @abstractmethod
-    def delete_user_data(self, user: User) -> None:
-        """Deletes all data for a user."""
-
     @property
     def db(self) -> DynamoDBServiceResource:
         if self.__db is None:
@@ -54,7 +51,7 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
 
     @functools.cached_property
     def table_name(self) -> str:
-        return f"www-{self._get_table_name()}{env.aws.dynamodb.table_suffix}"
+        return f"{env.aws.dynamodb.table_prefix}-{self._get_table_name()}"
 
     @property
     async def table(self) -> Table:
@@ -96,3 +93,55 @@ class DBCrud(AsyncContextManager["DBCrud"], ABC):
         table = await self.table
         response = await table.get_item(Key={"id": record_id})
         return response.get("Item")
+
+    async def create_table(self) -> None:
+        try:
+            await self.db.meta.client.describe_table(TableName=self.table_name)
+            logger.info("Found existing table %s", self.table_name)
+            return
+
+        except ClientError:
+            pass
+
+        logger.info("Creating table %s", self.table_name)
+        gsis_set = self.get_gsis()
+        gsis: list[tuple[str, str, Literal["S", "N", "B"], Literal["HASH", "RANGE"]]] = [
+            (f"{g}_index", g, "S", "HASH") for g in gsis_set
+        ]
+        keys = self.get_keys()
+
+        if gsis:
+            table = await self.db.create_table(
+                TableName=self.table_name,
+                AttributeDefinitions=[
+                    {"AttributeName": n, "AttributeType": t}
+                    for n, t in itertools.chain(((n, t) for (n, t, _) in keys), ((n, t) for _, n, t, _ in gsis))
+                ],
+                KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                GlobalSecondaryIndexes=(
+                    [
+                        {
+                            "IndexName": i,
+                            "KeySchema": [{"AttributeName": n, "KeyType": t}],
+                            "Projection": {"ProjectionType": "ALL"},
+                        }
+                        for i, n, _, t in gsis
+                    ]
+                ),
+                DeletionProtectionEnabled=env.aws.dynamodb.deletion_protection,
+                BillingMode="PAY_PER_REQUEST",
+            )
+
+        else:
+            table = await self.db.create_table(
+                AttributeDefinitions=[
+                    {"AttributeName": n, "AttributeType": t} for n, t in ((n, t) for (n, t, _) in keys)
+                ],
+                TableName=self.table_name,
+                KeySchema=[{"AttributeName": n, "KeyType": t} for n, _, t in keys],
+                DeletionProtectionEnabled=env.aws.dynamodb.deletion_protection,
+                BillingMode="PAY_PER_REQUEST",
+            )
+
+        # Wait for the table to be created.
+        await table.wait_until_exists()

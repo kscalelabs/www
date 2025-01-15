@@ -31,6 +31,10 @@ class S3Crud(AsyncContextManager["S3Crud"]):
             raise RuntimeError("Must call __aenter__ first!")
         return self.__s3
 
+    @property
+    def prefix(self) -> str:
+        return ""
+
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         session = aioboto3.Session()
@@ -45,6 +49,32 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         await asyncio.gather(
             super().__aexit__(exc_type, exc_val, exc_tb),
             *(resource.__aexit__(exc_type, exc_val, exc_tb) for resource in to_close),
+        )
+
+    async def create_bucket(self) -> None:
+        try:
+            await self.s3.meta.client.head_bucket(Bucket=env.aws.s3.bucket)
+            logger.info("Found existing bucket %s", env.aws.s3.bucket)
+            return
+        except ClientError:
+            pass
+
+        logger.info("Creating bucket %s", env.aws.s3.bucket)
+        await self.s3.create_bucket(Bucket=env.aws.s3.bucket)
+
+        logger.info("Updating %s CORS configuration", env.aws.s3.bucket)
+        s3_cors = await self.s3.BucketCors(env.aws.s3.bucket)
+        await s3_cors.put(
+            CORSConfiguration={
+                "CORSRules": [
+                    {
+                        "AllowedHeaders": ["*"],
+                        "AllowedMethods": ["GET"],
+                        "AllowedOrigins": ["*"],
+                        "ExposeHeaders": ["ETag"],
+                    }
+                ]
+            },
         )
 
     async def get_file_size(self, filename: str) -> int | None:
@@ -110,6 +140,28 @@ class S3Crud(AsyncContextManager["S3Crud"]):
         bucket = await self.s3.Bucket(env.aws.s3.bucket)
         await bucket.delete_objects(Delete={"Objects": [{"Key": f"{env.aws.s3.prefix}{filename}"}]})
 
+    async def get_file_hash(self, filename: str) -> str:
+        """Gets the hash of a file in S3."""
+        bucket = await self.s3.Bucket(env.aws.s3.bucket)
+        obj = await bucket.Object(f"{env.aws.s3.prefix}{filename}")
+        data = await obj.get()
+        return data["ETag"]
+
+    async def generate_presigned_download_url(
+        self,
+        s3_key: str,
+        expires_in: int = 3600,
+    ) -> str:
+        """Generates a presigned URL for downloading a file from S3."""
+        return await self.s3.meta.client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": env.aws.s3.bucket,
+                "Key": f"{env.aws.s3.prefix}{s3_key}",
+            },
+            ExpiresIn=expires_in,
+        )
+
     async def generate_presigned_upload_url(
         self,
         filename: str,
@@ -152,3 +204,13 @@ class S3Crud(AsyncContextManager["S3Crud"]):
 
 
 s3_crud = S3Crud()
+
+
+async def create_s3_bucket() -> None:
+    async with s3_crud as crud:
+        await crud.create_bucket()
+
+
+if __name__ == "__main__":
+    # python -m www.crud.s3
+    asyncio.run(create_s3_bucket())

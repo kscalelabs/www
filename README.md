@@ -15,3 +15,19 @@
 # K-Scale Website
 
 This is the codebase for K-Scale's web infrastructure.
+
+## Getting Started
+
+First, pull the repository and install the project:
+
+```bash
+git clone https://github.com/kscalelabs/www.git
+cd www
+pip install -e '.[dev]'
+```
+
+Next, start localstack:
+
+```bash
+make start-localstack
+```

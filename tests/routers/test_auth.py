@@ -4,6 +4,8 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
+HEADERS = {"Authorization": "Bearer test"}
+
 
 @pytest.mark.asyncio
 async def test_user_endpoint(test_client: TestClient) -> None:
@@ -27,7 +29,7 @@ async def test_profile_endpoint(test_client: TestClient) -> None:
     response = test_client.get("/auth/profile")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.text
 
-    response = test_client.get("/auth/profile", headers={"Authorization": "Bearer test"})
+    response = test_client.get("/auth/profile", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Matches test user data.
@@ -45,5 +47,5 @@ async def test_profile_endpoint(test_client: TestClient) -> None:
 
 @pytest.mark.asyncio
 async def test_logout_endpoint(test_client: TestClient) -> None:
-    response = test_client.get("/auth/logout", headers={"Authorization": "Bearer test"})
+    response = test_client.get("/auth/logout", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
