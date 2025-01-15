@@ -109,7 +109,7 @@ async def get_robots_for_user(
         return await crud.list_robots(user_id)
 
 
-@router.put("/add")
+@router.put("/{robot_name}")
 async def add_robot(
     robot_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
@@ -120,7 +120,7 @@ async def add_robot(
     return RobotResponse.from_robot(robot, robot_class)
 
 
-@router.put("/update")
+@router.post("/{robot_name}")
 async def update_robot(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     existing_robot_tuple: Annotated[tuple[Robot, RobotClass], Depends(_get_robot_and_class_by_name)],
@@ -141,7 +141,7 @@ async def update_robot(
     return RobotResponse.from_robot(robot, existing_robot_class)
 
 
-@router.delete("/delete")
+@router.delete("/{robot_name}")
 async def delete_robot(
     user: Annotated[User, Depends(require_user)],
     robot: Annotated[Robot, Depends(_get_base_robot_by_name)],
