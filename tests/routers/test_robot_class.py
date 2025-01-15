@@ -1,5 +1,8 @@
 """Unit tests for the robot class router."""
 
+import hashlib
+
+import httpx
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
@@ -76,3 +79,54 @@ async def test_robot_classes(test_client: TestClient) -> None:
     response = test_client.get("/robots/user/me", headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
     assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_urdf(test_client: TestClient) -> None:
+    # Adds a robot class.
+    response = test_client.put("/robots/add", params={"class_name": "test"}, headers=HEADERS)
+    assert response.status_code == status.HTTP_200_OK, response.text
+
+    # Uploads a URDF for the robot class.
+    response = test_client.put(
+        "/robots/urdf/test",
+        params={
+            "filename": "robot.urdf",
+            "content_type": "application/gzip",
+        },
+        headers=HEADERS,
+    )
+    assert response.status_code == status.HTTP_200_OK, response.text
+    data = response.json()
+    assert data["url"] is not None
+
+    # Uploads a URDF for the robot class.
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            url=data["url"],
+            data=b"test",
+            headers={"Content-Type": "application/gzip"},
+        )
+        assert response.status_code == status.HTTP_200_OK, response.text
+
+    # Gets the URDF for the robot class.
+    response = test_client.get("/robots/urdf/test", headers=HEADERS)
+    assert response.status_code == status.HTTP_200_OK, response.text
+    data = response.json()
+    assert data["url"] is not None
+
+    # Downloads the URDF from the presigned URL.
+    async with httpx.AsyncClient() as client:
+        response = await client.get(data["url"])
+        assert response.status_code == status.HTTP_200_OK, response.text
+        content = await response.aread()
+    assert content == b"test"
+    assert data["md5_hash"] == f'"{hashlib.md5(content).hexdigest()}"'
+
+    # Deletes the robot classes.
+    response = test_client.delete("/robots/delete", params={"class_name": "test"}, headers=HEADERS)
+    assert response.status_code == status.HTTP_200_OK, response.text
+
+    # Check that the URDF is deleted.
+    response = test_client.get("/robots/urdf/test", headers=HEADERS)
+    assert response.status_code == status.HTTP_404_NOT_FOUND, response.text
