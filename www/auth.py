@@ -1,13 +1,14 @@
 """Defines authentication functionality."""
 
+import datetime
 import logging
 from typing import Annotated, Any, Callable, Coroutine, Literal
 
 from fastapi import Depends, Request, Security, status
 from fastapi.exceptions import HTTPException
-from fastapi.security import OpenIdConnect, SecurityScopes
+from fastapi.security import APIKeyHeader, OpenIdConnect, SecurityScopes
 from httpx import AsyncClient
-from jwt import PyJWKClient, decode as jwt_decode
+from jwt import PyJWKClient, decode as jwt_decode, encode as jwt_encode
 from pydantic.main import BaseModel
 
 from www.settings import env
@@ -21,8 +22,15 @@ COGNITO_CLIENT_ID = "5lu9h7nhtf6dvlunpodjr9qil5"
 SERVER_METADATA_URL = f"{COGNITO_AUTHORITY}/.well-known/openid-configuration"
 JWKS_URL = f"{COGNITO_AUTHORITY}/.well-known/jwks.json"
 
+HEADER_NAME = "x-kscale-api-key"
+
 oidc = OpenIdConnect(
     openIdConnectUrl=SERVER_METADATA_URL,
+    auto_error=False,
+)
+
+api_key = APIKeyHeader(
+    name=HEADER_NAME,
     auto_error=False,
 )
 
@@ -34,6 +42,61 @@ class User(BaseModel):
     is_admin: bool
     can_upload: bool
     can_test: bool
+
+
+class UserInfo(BaseModel):
+    email: str
+    email_verified: bool
+
+
+def encode_api_key(user: User, user_info: UserInfo, exp_delta: datetime.timedelta) -> str:
+    """Returns a new API key for a user.
+
+    Args:
+        user: The user to get the API key for
+        user_info: The user info to get the API key for
+        exp_delta: The expiration delta for the API key
+
+    Returns:
+        A new API key for the user
+    """
+    groups = []
+    if user.is_admin:
+        groups.append("admin")
+    if user.can_upload:
+        groups.append("upload")
+    if user.can_test:
+        groups.append("test")
+
+    return jwt_encode(
+        {
+            "sub": user.id,
+            "groups": groups,
+            "email": user_info.email,
+            "email_verified": user_info.email_verified,
+            "exp": datetime.datetime.now(datetime.UTC) + exp_delta,
+        },
+        env.middleware.secret_key,
+        algorithm="HS256",
+    )
+
+
+def _decode_user_info_from_api_key(api_key: str) -> tuple[User, UserInfo]:
+    data = jwt_decode(api_key, env.middleware.secret_key, algorithms=["HS256"])
+
+    user = User(
+        id=data["sub"],
+        is_admin="admin" in data["groups"],
+        can_upload="upload" in data["groups"],
+        can_test="test" in data["groups"],
+    )
+
+    user_info = UserInfo(
+        email=data["email"],
+        email_verified=data["email_verified"],
+    )
+
+    return user, user_info
 
 
 def _decode_user_from_token(token: str) -> User:
@@ -85,6 +148,7 @@ def _decode_user_from_token(token: str) -> User:
 async def get_user(
     security_scopes: SecurityScopes,
     token: Annotated[str | None, Depends(oidc)],
+    api_key: Annotated[str | None, Depends(api_key)],
 ) -> User | None:
     """Gets the user from the OpenID Connect token.
 
@@ -92,17 +156,22 @@ async def get_user(
         security_scopes: The security scopes required for the endpoint
         token: The OpenID Connect token. If this is found, it is a string that
             looks like "Bearer <token>"
+        api_key: The API key. If this is found, it is a string that looks like
+            "Bearer <api_key>"
 
     Returns:
         The user information parsed from the OpenID Connect token, or None
         if no token was passed.
     """
-    if token is None:
+    if token is not None:
+        user = _decode_user_from_token(token)
+    elif api_key is not None:
+        user, _ = _decode_user_info_from_api_key(api_key)
+    else:
         return None
 
-    user = _decode_user_from_token(token)
-
-    if user and security_scopes.scopes:
+    # Checks security scopes.
+    if security_scopes.scopes:
         for scope in security_scopes.scopes:
             if scope == "admin" and not user.is_admin:
                 raise HTTPException(
@@ -116,6 +185,7 @@ async def get_user(
                     detail="Insufficient permissions",
                     headers={"WWW-Authenticate": f"Bearer scope={security_scopes.scope_str}"},
                 )
+
     return user
 
 
@@ -135,12 +205,7 @@ def require_permissions(permissions: set[Literal["admin", "upload"]]) -> Callabl
     return dependency
 
 
-class UserInfo(BaseModel):
-    email: str
-    email_verified: bool
-
-
-async def _decode_user_info_from_token(token: str) -> UserInfo:
+async def _decode_user_info_from_token(token: Annotated[str, Depends(oidc)]) -> UserInfo:
     async with AsyncClient() as client:
         # Gets the metadata from the OpenID Connect server.
         metadata_response = await client.get(SERVER_METADATA_URL)
@@ -173,11 +238,19 @@ async def _decode_user_info_from_token(token: str) -> UserInfo:
     return userinfo
 
 
-async def require_user_info(request: Request, token: Annotated[str | None, Depends(oidc)]) -> UserInfo:
+async def require_user_info(
+    request: Request,
+    token: Annotated[str | None, Depends(oidc)],
+    api_key: Annotated[str | None, Depends(api_key)],
+) -> UserInfo:
     if "userinfo" in request.session:
         return UserInfo(**request.session["userinfo"])
-    if token is None:
+    if token is not None:
+        userinfo = await _decode_user_info_from_token(token)
+        request.session["userinfo"] = userinfo.model_dump()
+    elif api_key is not None:
+        _, userinfo = _decode_user_info_from_api_key(api_key)
+        request.session["userinfo"] = userinfo.model_dump()
+    else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is not authenticated")
-    userinfo = await _decode_user_info_from_token(token)
-    request.session["userinfo"] = userinfo.model_dump()
     return userinfo

@@ -1,13 +1,22 @@
 """Defines the API endpoint for authenticating the user."""
 
+import datetime
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.requests import Request
 from pydantic.main import BaseModel
 
-from www.auth import COGNITO_AUTHORITY, COGNITO_CLIENT_ID, User, UserInfo, require_user, require_user_info
+from www.auth import (
+    COGNITO_AUTHORITY,
+    COGNITO_CLIENT_ID,
+    User,
+    UserInfo,
+    encode_api_key,
+    require_user,
+    require_user_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +62,35 @@ async def profile(
         email=user_info.email,
         email_verified=user_info.email_verified,
     )
+
+
+class APIKeyResponse(BaseModel):
+    api_key: str
+
+
+@router.get("/key")
+async def get_api_key(
+    user: Annotated[User, Depends(require_user)],
+    user_info: Annotated[UserInfo, Depends(require_user_info)],
+    num_hours: int = Query(default=24),
+) -> APIKeyResponse:
+    if num_hours < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Number of hours must be greater than 0",
+        )
+    if num_hours > 24:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Number of hours must be less than 24",
+        )
+
+    api_key = encode_api_key(
+        user=user,
+        user_info=user_info,
+        exp_delta=datetime.timedelta(hours=num_hours),
+    )
+    return APIKeyResponse(api_key=api_key)
 
 
 @router.get("/logout")
