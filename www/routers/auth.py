@@ -68,8 +68,8 @@ class APIKeyResponse(BaseModel):
     api_key: str
 
 
-@router.get("/key")
-async def get_api_key(
+@router.post("/key")
+async def create_api_key(
     user: Annotated[User, Depends(require_user)],
     user_info: Annotated[UserInfo, Depends(require_user_info)],
     num_hours: int = Query(default=24),
