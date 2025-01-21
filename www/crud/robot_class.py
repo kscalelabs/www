@@ -121,6 +121,7 @@ class RobotClassCrud(DBCrud):
             robot_class: The robot class to update.
             new_class_name: The new name of the robot class.
             new_description: The new description of the robot class.
+            new_metadata: The new metadata of the robot class.
 
         Returns:
             The robot class that was updated.
