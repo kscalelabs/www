@@ -58,7 +58,7 @@ class RobotClassCrud(DBCrud):
     def _is_valid_metadata(self, metadata: RobotURDFMetadata | None) -> bool:
         if metadata is None:
             return True
-        if metadata.joint_names_to_ids is not None and len(metadata.joint_names_to_ids) > 1000:
+        if metadata.joint_name_to_metadata is not None and len(metadata.joint_name_to_metadata) > 1000:
             return False
         return True
 
