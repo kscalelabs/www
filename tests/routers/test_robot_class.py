@@ -13,11 +13,11 @@ HEADERS = {"Authorization": "Bearer test"}
 @pytest.mark.asyncio
 async def test_robot_classes(test_client: TestClient) -> None:
     # Adds a robot class.
-    response = test_client.put("/robots/test", params={"description": "Test description"}, headers=HEADERS)
+    response = test_client.put("/robots/test", json={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Attempts to add a second robot class with the same name.
-    response = test_client.put("/robots/test", params={"description": "Test description"}, headers=HEADERS)
+    response = test_client.put("/robots/test", json={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_400_BAD_REQUEST, response.text
 
     # Gets the added robot class.
@@ -34,13 +34,13 @@ async def test_robot_classes(test_client: TestClient) -> None:
     assert data["class_name"] == "test"
 
     # Adds a second robot class.
-    response = test_client.put("/robots/othertest", params={"description": "Test description"}, headers=HEADERS)
+    response = test_client.put("/robots/othertest", json={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Updates the robot class.
     response = test_client.post(
         "/robots/test",
-        params={
+        json={
             "new_class_name": "othertest",
             "new_description": "new description",
         },
@@ -51,9 +51,18 @@ async def test_robot_classes(test_client: TestClient) -> None:
     # Updates the robot class.
     response = test_client.post(
         "/robots/test",
-        params={
+        json={
             "new_class_name": "newtest",
             "new_description": "new description",
+            "new_metadata": {
+                "joint_name_to_metadata": {
+                    "joint1": {
+                        "kd": 1.0,
+                        "lower_limit": 0.0,
+                        "upper_limit": 1.0,
+                    }
+                }
+            },
         },
         headers=HEADERS,
     )
@@ -82,13 +91,13 @@ async def test_robot_classes(test_client: TestClient) -> None:
 @pytest.mark.asyncio
 async def test_urdf(test_client: TestClient) -> None:
     # Adds a robot class.
-    response = test_client.put("/robots/test", params={"description": "Test description"}, headers=HEADERS)
+    response = test_client.put("/robots/test", json={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
 
     # Uploads a URDF for the robot class.
     response = test_client.put(
         "/robots/urdf/test",
-        params={
+        json={
             "filename": "robot_files.tgz",
             "content_type": "application/x-compressed-tar",
         },

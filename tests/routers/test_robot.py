@@ -10,7 +10,7 @@ HEADERS = {"Authorization": "Bearer test"}
 @pytest.mark.asyncio
 async def test_robots(test_client: TestClient) -> None:
     # First create a robot class that we'll use
-    response = test_client.put("/robots/test_class", params={"description": "Test description"}, headers=HEADERS)
+    response = test_client.put("/robots/test_class", json={"description": "Test description"}, headers=HEADERS)
     assert response.status_code == status.HTTP_200_OK, response.text
     robot_class_data = response.json()
     assert robot_class_data["id"] is not None
@@ -18,7 +18,7 @@ async def test_robots(test_client: TestClient) -> None:
     # Adds a robot
     response = test_client.put(
         "/robot/test_robot",
-        params={"description": "Test description", "class_name": "test_class"},
+        json={"description": "Test description", "class_name": "test_class"},
         headers=HEADERS,
     )
     assert response.status_code == status.HTTP_200_OK, response.text
@@ -31,7 +31,7 @@ async def test_robots(test_client: TestClient) -> None:
     # Attempts to add a second robot with the same name
     response = test_client.put(
         "/robot/test_robot",
-        params={"description": "Test description", "class_name": "test_class"},
+        json={"description": "Test description", "class_name": "test_class"},
         headers=HEADERS,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST, response.text
@@ -58,7 +58,7 @@ async def test_robots(test_client: TestClient) -> None:
     # Adds a second robot
     response = test_client.put(
         "/robot/other_robot",
-        params={"description": "Test description", "class_name": "test_class"},
+        json={"description": "Test description", "class_name": "test_class"},
         headers=HEADERS,
     )
     assert response.status_code == status.HTTP_200_OK, response.text
@@ -66,7 +66,7 @@ async def test_robots(test_client: TestClient) -> None:
     # Updates the first robot
     response = test_client.post(
         "/robot/test_robot",
-        params={
+        json={
             "new_robot_name": "updated_robot",
             "new_description": "new description",
         },
