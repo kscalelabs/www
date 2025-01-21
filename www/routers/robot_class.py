@@ -3,12 +3,17 @@
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from pydantic import BaseModel
 
 from www.auth import User, require_permissions, require_user
 from www.crud.base.s3 import S3Crud, s3_crud
-from www.crud.robot_class import RobotClass, RobotClassCrud, robot_class_crud
+from www.crud.robot_class import (
+    RobotClass,
+    RobotClassCrud,
+    RobotURDFMetadata,
+    robot_class_crud,
+)
 from www.errors import ActionNotAllowedError, ItemNotFoundError
 
 router = APIRouter()
@@ -55,18 +60,25 @@ async def get_robot_classes_for_user(
         return await crud.list_robot_classes(user_id)
 
 
+class AddRobotClassRequest(BaseModel):
+    description: str | None = None
+
+
 @router.put("/{class_name}")
 async def add_robot_class(
     class_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
-    description: str | None = Query(
-        default=None,
-        description="The description of the robot class",
-    ),
+    request: Annotated[AddRobotClassRequest, Body()],
 ) -> RobotClass:
     """Adds a robot class."""
-    return await crud.add_robot_class(class_name, user.id, description)
+    return await crud.add_robot_class(class_name, user.id, request.description)
+
+
+class UpdateRobotClassRequest(BaseModel):
+    new_class_name: str | None = None
+    new_description: str | None = None
+    new_metadata: RobotURDFMetadata | None = None
 
 
 @router.post("/{class_name}")
@@ -74,14 +86,7 @@ async def update_robot_class(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     existing_robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
     crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
-    new_class_name: str | None = Query(
-        default=None,
-        description="The new name of the robot class",
-    ),
-    new_description: str | None = Query(
-        default=None,
-        description="The new description of the robot class",
-    ),
+    request: Annotated[UpdateRobotClassRequest, Body()],
 ) -> RobotClass:
     """Updates a robot class."""
     if existing_robot_class.user_id != user.id:
@@ -89,8 +94,9 @@ async def update_robot_class(
 
     return await crud.update_robot_class(
         robot_class=existing_robot_class,
-        new_class_name=new_class_name,
-        new_description=new_description,
+        new_class_name=request.new_class_name,
+        new_description=request.new_description,
+        new_metadata=request.new_metadata,
     )
 
 
@@ -131,6 +137,11 @@ async def get_urdf_for_robot(
     return RobotDownloadURDFResponse(url=url, md5_hash=md5_hash)
 
 
+class RobotUploadURDFRequest(BaseModel):
+    filename: str
+    content_type: str
+
+
 class RobotUploadURDFResponse(BaseModel):
     url: str
     filename: str
@@ -139,28 +150,27 @@ class RobotUploadURDFResponse(BaseModel):
 
 @urdf_router.put("/{class_name}")
 async def upload_urdf_for_robot(
-    filename: str,
-    content_type: str,
-    user: Annotated[User, Depends(require_permissions({"upload"}))],
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
+    user: Annotated[User, Depends(require_permissions({"upload"}))],
+    request: Annotated[RobotUploadURDFRequest, Body()],
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> RobotUploadURDFResponse:
     # Checks that the content type is .tgz file.
-    if content_type != "application/x-compressed-tar":
-        raise ValueError(f"Invalid content type: {content_type}")
-    if not filename.lower().endswith(".tgz"):
-        raise ValueError(f"Invalid filename: {filename}")
+    if request.content_type != "application/x-compressed-tar":
+        raise ValueError(f"Invalid content type: {request.content_type}")
+    if not request.filename.lower().endswith(".tgz"):
+        raise ValueError(f"Invalid filename: {request.filename}")
     if robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     s3_key = urdf_s3_key(robot_class)
-    url = await fs_crud.generate_presigned_upload_url(filename, s3_key, content_type)
-    return RobotUploadURDFResponse(url=url, filename=filename, content_type=content_type)
+    url = await fs_crud.generate_presigned_upload_url(request.filename, s3_key, request.content_type)
+    return RobotUploadURDFResponse(url=url, filename=request.filename, content_type=request.content_type)
 
 
 @urdf_router.delete("/{class_name}")
 async def delete_urdf_for_robot(
-    user: Annotated[User, Depends(require_permissions({"upload"}))],
     robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
+    user: Annotated[User, Depends(require_permissions({"upload"}))],
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> bool:
     if robot_class.user_id != user.id:

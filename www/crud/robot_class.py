@@ -2,6 +2,7 @@
 
 import asyncio
 import re
+from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from pydantic import BaseModel
@@ -11,6 +12,19 @@ from www.errors import InvalidNameError
 from www.utils.db import new_uuid
 
 
+class JointMetadata(BaseModel):
+    id: int | None = None
+    kp: float | None = None
+    kd: float | None = None
+    offset: float | None = None
+    lower_limit: float | None = None
+    upper_limit: float | None = None
+
+
+class RobotURDFMetadata(BaseModel):
+    joint_name_to_metadata: dict[str, JointMetadata] | None = None
+
+
 class RobotClass(BaseModel):
     """Defines the data structure for a robot class."""
 
@@ -18,6 +32,7 @@ class RobotClass(BaseModel):
     class_name: str
     description: str
     user_id: str
+    metadata: RobotURDFMetadata | None = None
 
 
 class RobotClassCrud(DBCrud):
@@ -39,6 +54,13 @@ class RobotClassCrud(DBCrud):
 
     def _is_valid_description(self, description: str | None) -> bool:
         return description is None or len(description) < 2048
+
+    def _is_valid_metadata(self, metadata: RobotURDFMetadata | None) -> bool:
+        if metadata is None:
+            return True
+        if metadata.joint_names_to_ids is not None and len(metadata.joint_names_to_ids) > 1000:
+            return False
+        return True
 
     async def add_robot_class(
         self,
@@ -91,6 +113,7 @@ class RobotClassCrud(DBCrud):
         robot_class: RobotClass,
         new_class_name: str | None = None,
         new_description: str | None = None,
+        new_metadata: RobotURDFMetadata | None = None,
     ) -> RobotClass:
         """Updates a robot class in the database.
 
@@ -106,30 +129,44 @@ class RobotClassCrud(DBCrud):
             raise InvalidNameError(f"Invalid robot class name: {new_class_name}")
         if new_description is not None and not self._is_valid_description(new_description):
             raise InvalidNameError("Invalid robot class description")
+        if new_metadata is not None and not self._is_valid_metadata(new_metadata):
+            raise InvalidNameError("Invalid robot class metadata")
 
         table = await self.table
 
+        update_expression_parts: list[str] = []
+        expression_attribute_values: dict[str, Any] = {}
+
         # Populates values.
         old_class_name = robot_class.class_name
+        expression_attribute_values[":old_class_name"] = old_class_name
         if new_class_name is not None:
             if old_class_name != new_class_name:
                 if (await self.get_robot_class_by_name(new_class_name)) is not None:
                     raise ValueError(f"Robot class with name '{new_class_name}' already exists")
             robot_class.class_name = new_class_name
+            update_expression_parts.append("class_name = :new_class_name")
+            expression_attribute_values[":new_class_name"] = new_class_name
 
         if new_description is not None:
             robot_class.description = new_description
+            update_expression_parts.append("description = :new_description")
+            expression_attribute_values[":new_description"] = new_description
+
+        if new_metadata is not None:
+            update_expression_parts.append("metadata = :new_metadata")
+            expression_attribute_values[":new_metadata"] = new_metadata.model_dump()
+
+        if len(update_expression_parts) == 0:
+            breakpoint()
+            raise ValueError("No updates to the robot class")
 
         try:
             await table.update_item(
                 Key={"id": robot_class.id},
-                UpdateExpression=("SET class_name = :new_class_name, description = :new_description"),
+                UpdateExpression="SET " + ", ".join(update_expression_parts),
                 ConditionExpression="attribute_not_exists(class_name) OR class_name = :old_class_name",
-                ExpressionAttributeValues={
-                    ":new_class_name": robot_class.class_name,
-                    ":new_description": robot_class.description,
-                    ":old_class_name": old_class_name,
-                },
+                ExpressionAttributeValues=expression_attribute_values,
             )
         except table.meta.client.exceptions.ConditionalCheckFailedException:
             raise ValueError(f"Robot class with name '{new_class_name}' already exists")
@@ -179,4 +216,5 @@ robot_class_crud = RobotClassCrud()
 
 if __name__ == "__main__":
     # python -m www.crud.robot_class
+    asyncio.run(robot_class_crud.create_table())
     asyncio.run(robot_class_crud.create_table())

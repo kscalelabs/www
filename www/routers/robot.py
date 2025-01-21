@@ -2,14 +2,13 @@
 
 from typing import Annotated, Self
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from pydantic import BaseModel
 
 from www.auth import User, require_permissions, require_user
 from www.crud.robot import Robot, RobotCrud, robot_crud
 from www.crud.robot_class import RobotClass, RobotClassCrud, robot_class_crud
 from www.errors import ActionNotAllowedError, ItemNotFoundError
-from www.routers.robot_class import get_robot_class_by_name
 
 router = APIRouter()
 
@@ -114,19 +113,29 @@ async def get_robots_for_user(
         return await crud.list_robots(user_id)
 
 
+class AddRobotRequest(BaseModel):
+    description: str | None = None
+    class_name: str
+
+
 @router.put("/{robot_name}")
 async def add_robot(
     robot_name: str,
     user: Annotated[User, Depends(require_permissions({"upload"}))],
-    robot_class: Annotated[RobotClass, Depends(get_robot_class_by_name)],
-    crud: Annotated[RobotCrud, Depends(robot_crud)],
-    description: str | None = Query(
-        default=None,
-        description="The description of the robot",
-    ),
+    r_crud: Annotated[RobotCrud, Depends(robot_crud)],
+    rc_crud: Annotated[RobotClassCrud, Depends(robot_class_crud)],
+    request: Annotated[AddRobotRequest, Body()],
 ) -> RobotResponse:
-    robot = await crud.add_robot(robot_name, user.id, robot_class.id, description)
+    robot_class = await rc_crud.get_robot_class_by_name(request.class_name)
+    if robot_class is None:
+        raise ItemNotFoundError(f"Robot class '{request.class_name}' not found")
+    robot = await r_crud.add_robot(robot_name, user.id, robot_class.id, request.description)
     return RobotResponse.from_robot(robot, robot_class)
+
+
+class UpdateRobotRequest(BaseModel):
+    new_robot_name: str | None = None
+    new_description: str | None = None
 
 
 @router.post("/{robot_name}")
@@ -134,19 +143,12 @@ async def update_robot(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     existing_robot_tuple: Annotated[tuple[Robot, RobotClass], Depends(_get_robot_and_class_by_name)],
     crud: Annotated[RobotCrud, Depends(robot_crud)],
-    new_robot_name: str | None = Query(
-        default=None,
-        description="The new name of the robot",
-    ),
-    new_description: str | None = Query(
-        default=None,
-        description="The new description of the robot",
-    ),
+    request: Annotated[UpdateRobotRequest, Body()],
 ) -> RobotResponse:
     existing_robot, existing_robot_class = existing_robot_tuple
     if existing_robot.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot")
-    robot = await crud.update_robot(existing_robot, user.id, new_robot_name, new_description)
+    robot = await crud.update_robot(existing_robot, user.id, request.new_robot_name, request.new_description)
     return RobotResponse.from_robot(robot, existing_robot_class)
 
 
