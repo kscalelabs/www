@@ -4,8 +4,7 @@ import datetime
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.requests import Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic.main import BaseModel
 
 from www.auth import (
@@ -72,7 +71,7 @@ class APIKeyResponse(BaseModel):
 async def create_api_key(
     user: Annotated[User, Depends(require_user)],
     user_info: Annotated[UserInfo, Depends(require_user_info)],
-    num_hours: int = Query(default=24),
+    num_hours: Annotated[int, Body(default=24)],
 ) -> APIKeyResponse:
     if num_hours < 1:
         raise HTTPException(
