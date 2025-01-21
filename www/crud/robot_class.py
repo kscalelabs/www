@@ -2,6 +2,7 @@
 
 import asyncio
 import re
+from decimal import Decimal
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
@@ -14,11 +15,11 @@ from www.utils.db import new_uuid
 
 class JointMetadata(BaseModel):
     id: int | None = None
-    kp: float | None = None
-    kd: float | None = None
-    offset: float | None = None
-    lower_limit: float | None = None
-    upper_limit: float | None = None
+    kp: Decimal | None = None
+    kd: Decimal | None = None
+    offset: Decimal | None = None
+    lower_limit: Decimal | None = None
+    upper_limit: Decimal | None = None
 
 
 class RobotURDFMetadata(BaseModel):

@@ -54,6 +54,15 @@ async def test_robot_classes(test_client: TestClient) -> None:
         json={
             "new_class_name": "newtest",
             "new_description": "new description",
+            "new_metadata": {
+                "joint_name_to_metadata": {
+                    "joint1": {
+                        "kd": 1.0,
+                        "lower_limit": 0.0,
+                        "upper_limit": 1.0,
+                    }
+                }
+            },
         },
         headers=HEADERS,
     )
