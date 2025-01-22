@@ -18,6 +18,7 @@ class JointMetadata(BaseModel):
     kp: Decimal | None = None
     kd: Decimal | None = None
     armature: Decimal | None = None
+    friction: Decimal | None = None
     offset: Decimal | None = None
     flipped: bool | None = None
 
