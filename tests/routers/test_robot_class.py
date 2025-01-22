@@ -57,9 +57,8 @@ async def test_robot_classes(test_client: TestClient) -> None:
             "new_metadata": {
                 "joint_name_to_metadata": {
                     "joint1": {
+                        "id": 1,
                         "kd": 1.0,
-                        "lower_limit": 0.0,
-                        "upper_limit": 1.0,
                     }
                 }
             },
