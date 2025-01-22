@@ -63,6 +63,10 @@ async def profile(
     )
 
 
+class APIKeyRequest(BaseModel):
+    num_hours: int = 24
+
+
 class APIKeyResponse(BaseModel):
     api_key: str
 
@@ -71,7 +75,7 @@ class APIKeyResponse(BaseModel):
 async def create_api_key(
     user: Annotated[User, Depends(require_user)],
     user_info: Annotated[UserInfo, Depends(require_user_info)],
-    num_hours: Annotated[int, Body(default=24)],
+    num_hours: Annotated[APIKeyRequest, Body()],
 ) -> APIKeyResponse:
     if num_hours < 1:
         raise HTTPException(
