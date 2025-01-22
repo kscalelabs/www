@@ -20,6 +20,7 @@ class JointMetadata(BaseModel):
     offset: Decimal | None = None
     lower_limit: Decimal | None = None
     upper_limit: Decimal | None = None
+    flipped: bool | None = None
 
 
 class RobotURDFMetadata(BaseModel):
