@@ -23,6 +23,7 @@ class JointMetadata(BaseModel):
 
 class RobotURDFMetadata(BaseModel):
     joint_name_to_metadata: dict[str, JointMetadata] | None = None
+    control_frequency: Decimal | None = None
 
 
 class RobotClass(BaseModel):
