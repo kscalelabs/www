@@ -18,8 +18,6 @@ class JointMetadata(BaseModel):
     kp: Decimal | None = None
     kd: Decimal | None = None
     offset: Decimal | None = None
-    lower_limit: Decimal | None = None
-    upper_limit: Decimal | None = None
     flipped: bool | None = None
 
 
