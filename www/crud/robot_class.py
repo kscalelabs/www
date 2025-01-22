@@ -17,6 +17,7 @@ class JointMetadata(BaseModel):
     id: int | None = None
     kp: Decimal | None = None
     kd: Decimal | None = None
+    armature: Decimal | None = None
     offset: Decimal | None = None
     flipped: bool | None = None
 
