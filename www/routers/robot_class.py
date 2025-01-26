@@ -89,7 +89,7 @@ async def update_robot_class(
     request: Annotated[UpdateRobotClassRequest, Body()],
 ) -> RobotClass:
     """Updates a robot class."""
-    if existing_robot_class.user_id != user.id:
+    if not user.is_admin and existing_robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
 
     return await crud.update_robot_class(
@@ -108,7 +108,7 @@ async def delete_robot_class(
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> bool:
     """Deletes a robot class."""
-    if robot_class.user_id != user.id:
+    if not user.is_admin and robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     s3_key = urdf_s3_key(robot_class)
     await fs_crud.delete_from_s3(s3_key)
@@ -160,7 +160,7 @@ async def upload_urdf_for_robot(
         raise ValueError(f"Invalid content type: {request.content_type}")
     if not request.filename.lower().endswith(".tgz"):
         raise ValueError(f"Invalid filename: {request.filename}")
-    if robot_class.user_id != user.id:
+    if not user.is_admin and robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     s3_key = urdf_s3_key(robot_class)
     url = await fs_crud.generate_presigned_upload_url(request.filename, s3_key, request.content_type)
@@ -173,7 +173,7 @@ async def delete_urdf_for_robot(
     user: Annotated[User, Depends(require_permissions({"upload"}))],
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> bool:
-    if robot_class.user_id != user.id:
+    if not user.is_admin and robot_class.user_id != user.id:
         raise ActionNotAllowedError("You are not the owner of this robot class")
     s3_key = urdf_s3_key(robot_class)
     await fs_crud.delete_from_s3(s3_key)
