@@ -75,14 +75,14 @@ class APIKeyResponse(BaseModel):
 async def create_api_key(
     user: Annotated[User, Depends(require_user)],
     user_info: Annotated[UserInfo, Depends(require_user_info)],
-    num_hours: Annotated[APIKeyRequest, Body()],
+    request: Annotated[APIKeyRequest, Body()],
 ) -> APIKeyResponse:
-    if num_hours < 1:
+    if request.num_hours < 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Number of hours must be greater than 0",
         )
-    if num_hours > 24:
+    if request.num_hours > 24:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Number of hours must be less than 24",
@@ -91,7 +91,7 @@ async def create_api_key(
     api_key = encode_api_key(
         user=user,
         user_info=user_info,
-        exp_delta=datetime.timedelta(hours=num_hours),
+        exp_delta=datetime.timedelta(hours=request.num_hours),
     )
     return APIKeyResponse(api_key=api_key)
 
