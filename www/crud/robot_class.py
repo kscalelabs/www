@@ -159,7 +159,8 @@ class RobotClassCrud(DBCrud):
 
         if new_metadata is not None:
             update_expression_parts.append("metadata = :new_metadata")
-            expression_attribute_values[":new_metadata"] = new_metadata.model_dump()
+            new_metadata_dict = {k: v for k, v in new_metadata.model_dump().items() if v is not None}
+            expression_attribute_values[":new_metadata"] = new_metadata_dict
 
         if len(update_expression_parts) == 0:
             breakpoint()
