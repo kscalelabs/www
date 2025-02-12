@@ -146,6 +146,18 @@ def _decode_user_from_token(token: str) -> User:
             can_test="www-test" in groups,
         )
 
+    except DecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error decoding the provided token",
+        )
+
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,  # Return 401 to indicate that the token is invalid
