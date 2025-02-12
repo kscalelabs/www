@@ -84,15 +84,15 @@ def encode_api_key(user: User, user_info: UserInfo, exp_delta: datetime.timedelt
 def _decode_user_info_from_api_key(api_key: str) -> tuple[User, UserInfo]:
     try:
         data = jwt_decode(api_key, env.middleware.secret_key, algorithms=["HS256"])
-    except InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
     except DecodeError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Error decoding the provided API key",
+        )
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
         )
     except Exception as e:
         raise HTTPException(
