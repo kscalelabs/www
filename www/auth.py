@@ -8,7 +8,7 @@ from fastapi import Depends, Request, Security, status
 from fastapi.exceptions import HTTPException
 from fastapi.security import APIKeyHeader, OpenIdConnect, SecurityScopes
 from httpx import AsyncClient
-from jwt import PyJWKClient, decode as jwt_decode, encode as jwt_encode
+from jwt import DecodeError, InvalidTokenError, PyJWKClient, decode as jwt_decode, encode as jwt_encode
 from pydantic.main import BaseModel
 
 from www.settings import env
@@ -82,7 +82,23 @@ def encode_api_key(user: User, user_info: UserInfo, exp_delta: datetime.timedelt
 
 
 def _decode_user_info_from_api_key(api_key: str) -> tuple[User, UserInfo]:
-    data = jwt_decode(api_key, env.middleware.secret_key, algorithms=["HS256"])
+    try:
+        data = jwt_decode(api_key, env.middleware.secret_key, algorithms=["HS256"])
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    except DecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error decoding the provided API key",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unknown error while decoding the provided API key",
+        ) from e
 
     user = User(
         id=data["sub"],

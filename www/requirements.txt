@@ -37,4 +37,3 @@ types-aioboto3[dynamodb,s3,cloudfront]
 pybullet
 mujoco
 kscale-onshape-library[all]
-krec
