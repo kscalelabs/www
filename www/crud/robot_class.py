@@ -21,6 +21,7 @@ class JointMetadata(BaseModel):
     friction: Decimal | None = None
     offset: Decimal | None = None
     flipped: bool | None = None
+    actuator_type: str | None = None
 
 
 class RobotURDFMetadata(BaseModel):
