@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y \
     libglfw3-dev \
     libgomp1
 
+# Upgrade pip and install dependencies.
+RUN pip install --upgrade pip setuptools wheel
+
 # Install Python dependencies.
 RUN pip install \
     --no-cache-dir \
