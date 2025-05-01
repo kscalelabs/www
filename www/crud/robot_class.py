@@ -22,6 +22,8 @@ class JointMetadata(BaseModel):
     offset: Decimal | None = None
     flipped: bool | None = None
     actuator_type: str | None = None
+    nn_id: int | None = None
+    soft_torque_limit: Decimal | None = None
 
 
 class RobotURDFMetadata(BaseModel):
