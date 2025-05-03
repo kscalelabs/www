@@ -36,4 +36,4 @@ types-aioboto3[dynamodb,s3,cloudfront]
 # Converting files
 pybullet
 mujoco
-kscale-onshape-library[all]
+onshape[all]
