@@ -15,4 +15,4 @@ def add_routers(app: FastAPI) -> None:
 
     # Mark the non-auth routers as protected.
     app.include_router(robot_router, prefix="/robot", tags=["robot"], dependencies=[Depends(require_user)])
-    app.include_router(robot_class_router, prefix="/robots", tags=["robots"], dependencies=[Depends(require_user)])
+    app.include_router(robot_class_router, prefix="/robots", tags=["robots"])
