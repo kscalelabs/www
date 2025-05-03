@@ -39,6 +39,7 @@ class RobotClass(BaseModel):
     description: str
     user_id: str
     metadata: RobotURDFMetadata | None = None
+    num_downloads: int = 0
 
 
 class RobotClassCrud(DBCrud):
@@ -96,6 +97,7 @@ class RobotClassCrud(DBCrud):
             class_name=class_name,
             description="Empty description" if description is None else description,
             user_id=user_id,
+            num_downloads=0,
         )
 
         # Check if the robot class already exists.
@@ -219,10 +221,19 @@ class RobotClassCrud(DBCrud):
             response = await table.scan()
         return [RobotClass.model_validate(item) for item in response.get("Items", [])]
 
+    async def increment_downloads(self, robot_class: RobotClass) -> None:
+        """Increments the number of downloads for a robot class."""
+        table = await self.table
+        await table.update_item(
+            Key={"id": robot_class.id},
+            UpdateExpression="SET num_downloads = if_not_exists(num_downloads, :zero) + :increment",
+            ExpressionAttributeValues={":increment": 1, ":zero": 0},
+            ReturnValues="NONE",
+        )
+
 
 robot_class_crud = RobotClassCrud()
 
 if __name__ == "__main__":
     # python -m www.crud.robot_class
-    asyncio.run(robot_class_crud.create_table())
     asyncio.run(robot_class_crud.create_table())
