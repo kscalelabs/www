@@ -131,7 +131,7 @@ async def get_urdf_for_robot(
     fs_crud: Annotated[S3Crud, Depends(s3_crud)],
 ) -> RobotDownloadURDFResponse:
     s3_key = urdf_s3_key(robot_class)
-    url, md5_hash = await asyncio.gather(
+    _, url, md5_hash = await asyncio.gather(
         db_crud.increment_downloads(robot_class),
         fs_crud.generate_presigned_download_url(s3_key),
         fs_crud.get_file_hash(s3_key),
