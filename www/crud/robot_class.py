@@ -26,8 +26,28 @@ class JointMetadata(BaseModel):
     soft_torque_limit: Decimal | None = None
 
 
+class ActuatorMetadata(BaseModel):
+    """Defines the metadata for an actuator."""
+
+    actuator_type: str | None = None
+    sysid: str | None = None
+    max_torque: Decimal | None = None
+    armature: Decimal | None = None
+    damping: Decimal | None = None
+    frictionloss: Decimal | None = None
+    vin: Decimal | None = None
+    kt: Decimal | None = None
+    R: Decimal | None = None
+    vmax: Decimal | None = None
+    amax: Decimal | None = None
+    max_velocity: Decimal | None = None
+    max_pwm: Decimal | None = None
+    error_gain: Decimal | None = None
+
+
 class RobotURDFMetadata(BaseModel):
     joint_name_to_metadata: dict[str, JointMetadata] | None = None
+    actuator_type_to_metadata: dict[str, ActuatorMetadata] | None = None
     control_frequency: Decimal | None = None
 
 
@@ -66,6 +86,8 @@ class RobotClassCrud(DBCrud):
         if metadata is None:
             return True
         if metadata.joint_name_to_metadata is not None and len(metadata.joint_name_to_metadata) > 1000:
+            return False
+        if metadata.actuator_type_to_metadata is not None and len(metadata.actuator_type_to_metadata) > 1000:
             return False
         return True
 
