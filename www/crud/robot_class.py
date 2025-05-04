@@ -28,6 +28,7 @@ class JointMetadata(BaseModel):
 
 class ActuatorMetadata(BaseModel):
     """Defines the metadata for an actuator."""
+
     actuator_type: str | None = None
     sysid: str | None = None
     max_torque: Decimal | None = None
