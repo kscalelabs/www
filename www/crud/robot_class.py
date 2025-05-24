@@ -24,6 +24,8 @@ class JointMetadata(BaseModel):
     actuator_type: str | None = None
     nn_id: int | None = None
     soft_torque_limit: Decimal | None = None
+    min_angle_deg: Decimal | None = None
+    max_angle_deg: Decimal | None = None
 
 
 class ActuatorMetadata(BaseModel):
